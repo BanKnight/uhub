@@ -35,6 +35,10 @@ export const revokeApiKeyInputSchema = z.object({
   id: z.string().min(1),
 });
 
+export const rotateApiKeyInputSchema = z.object({
+  id: z.string().min(1),
+});
+
 export const portalExchangeInputSchema = z.object({
   rawKey: z.string().min(1),
 });
@@ -50,5 +54,6 @@ export type ApiKey = z.infer<typeof apiKeySchema>;
 export type CreateApiKeyInput = z.infer<typeof createApiKeyInputSchema>;
 export type CreateApiKeyResult = z.infer<typeof createApiKeyResultSchema>;
 export type RevokeApiKeyInput = z.infer<typeof revokeApiKeyInputSchema>;
+export type RotateApiKeyInput = z.infer<typeof rotateApiKeyInputSchema>;
 export type PortalExchangeInput = z.infer<typeof portalExchangeInputSchema>;
 export type PortalExchangeResult = z.infer<typeof portalExchangeResultSchema>;

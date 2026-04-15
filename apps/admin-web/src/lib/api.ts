@@ -1,11 +1,14 @@
 import { createTRPCUntypedClient, httpBatchLink } from '@trpc/client';
 import type {
+  AnalyticsSummary,
   ApiKey,
+  AuditRequestItem,
   Channel,
   CreateApiKeyInput,
   CreateApiKeyResult,
   CreateChannelInput,
   RevokeApiKeyInput,
+  RotateApiKeyInput,
   UpdateChannelStatusInput,
 } from '@uhub/shared';
 
@@ -49,4 +52,16 @@ export function createApiKey(input: CreateApiKeyInput) {
 
 export function revokeApiKey(input: RevokeApiKeyInput) {
   return client.mutation('admin.apiKeys.revoke', input) as Promise<ApiKey>;
+}
+
+export function rotateApiKey(input: RotateApiKeyInput) {
+  return client.mutation('admin.apiKeyRotation.rotate', input) as Promise<CreateApiKeyResult>;
+}
+
+export function getAnalyticsSummary() {
+  return client.query('admin.analytics.summary') as Promise<AnalyticsSummary>;
+}
+
+export function listAuditRequests() {
+  return client.query('admin.audit.list') as Promise<AuditRequestItem[]>;
 }

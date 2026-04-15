@@ -196,6 +196,38 @@ export async function revokeApiKey(env: WorkerEnv, apiKeyId: string): Promise<Ap
   return apiKey;
 }
 
+export async function rotateApiKey(env: WorkerEnv, apiKeyId: string): Promise<CreateApiKeyResult> {
+  const db = getDb(env);
+  const now = Date.now();
+  const existing = await db.select().from(apiKeys).where(eq(apiKeys.id, apiKeyId)).get();
+
+  if (!existing) {
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: 'API key not found',
+    });
+  }
+
+  const rules = await getRules(env, apiKeyId);
+
+  await db
+    .update(apiKeys)
+    .set({
+      status: 'revoked',
+      revokedAt: now,
+      updatedAt: now,
+    })
+    .where(eq(apiKeys.id, apiKeyId));
+
+  return createApiKey(env, {
+    label: existing.label,
+    channelIds: rules.channelIds,
+    endpointRules: rules.endpointRules,
+    maxConcurrency: existing.maxConcurrency,
+    expiresAt: existing.expiresAt ?? null,
+  });
+}
+
 export async function findApiKeyByRawKey(env: WorkerEnv, rawKey: string): Promise<ApiKeyLookup | null> {
   const db = getDb(env);
   const keyHash = await sha256(rawKey);

@@ -1,13 +1,16 @@
 import React from 'react';
 import { QueryClient, QueryClientProvider, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createRootRoute, createRoute, createRouter, Outlet, redirect, RouterProvider, useNavigate } from '@tanstack/react-router';
-import type { ApiKey, CreateApiKeyInput, Channel, CreateChannelInput, UpdateChannelStatusInput } from '@uhub/shared';
+import type { AnalyticsSummary, ApiKey, AuditRequestItem, CreateApiKeyInput, Channel, CreateChannelInput, UpdateChannelStatusInput } from '@uhub/shared';
 import {
   createApiKey as createApiKeyRequest,
   createChannel as createChannelRequest,
+  getAnalyticsSummary as getAnalyticsSummaryRequest,
   listApiKeys,
+  listAuditRequests,
   listChannels,
   revokeApiKey as revokeApiKeyRequest,
+  rotateApiKey as rotateApiKeyRequest,
   updateChannelStatus,
 } from './lib/api';
 import { adminAuthClient, getAdminSession } from './lib/auth';
@@ -15,6 +18,8 @@ import { adminAuthClient, getAdminSession } from './lib/auth';
 const queryClient = new QueryClient();
 const channelsQueryKey = ['admin', 'channels'];
 const apiKeysQueryKey = ['admin', 'apiKeys'];
+const analyticsQueryKey = ['admin', 'analytics'];
+const auditQueryKey = ['admin', 'audit'];
 const sessionQueryKey = ['admin', 'session'];
 const initialChannelForm: CreateChannelInput = {
   name: '',
@@ -121,6 +126,76 @@ function SignInPage() {
   );
 }
 
+function AnalyticsSection({ analytics }: { analytics: AnalyticsSummary }) {
+  return (
+    <section>
+      <h2>Dashboard</h2>
+      <p>Milestone 8 minimal analytics shell.</p>
+      <ul>
+        <li>Total requests: {analytics.totalRequests}</li>
+        <li>Completed: {analytics.completedRequests}</li>
+        <li>Failed: {analytics.failedRequests}</li>
+        <li>Rejected: {analytics.rejectedRequests}</li>
+      </ul>
+
+      <h3>By endpoint</h3>
+      {analytics.endpointBreakdown.length === 0 ? <p>No request analytics yet.</p> : null}
+      <ul>
+        {analytics.endpointBreakdown.map((item) => (
+          <li key={item.endpoint}>
+            <strong>{item.endpoint}</strong>
+            <div>Total: {item.totalRequests}</div>
+            <div>Completed: {item.completedRequests}</div>
+            <div>Failed: {item.failedRequests}</div>
+            <div>Rejected: {item.rejectedRequests}</div>
+            <div>Avg latency: {item.avgLatencyMs ?? 'n/a'}</div>
+          </li>
+        ))}
+      </ul>
+
+      <h3>By channel</h3>
+      {analytics.channelBreakdown.length === 0 ? <p>No channel analytics yet.</p> : null}
+      <ul>
+        {analytics.channelBreakdown.map((item) => (
+          <li key={item.channelId}>
+            <strong>{item.channelName ?? item.channelId}</strong>
+            <div>Channel ID: {item.channelId}</div>
+            <div>Total: {item.totalRequests}</div>
+            <div>Completed: {item.completedRequests}</div>
+            <div>Failed: {item.failedRequests}</div>
+            <div>Rejected: {item.rejectedRequests}</div>
+            <div>Avg latency: {item.avgLatencyMs ?? 'n/a'}</div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function AuditSection({ items }: { items: AuditRequestItem[] }) {
+  return (
+    <section>
+      <h2>Audit</h2>
+      {items.length === 0 ? <p>No audit requests yet.</p> : null}
+      <ul>
+        {items.map((item) => (
+          <li key={item.id}>
+            <strong>{item.apiKeyLabel ?? item.apiKeyId}</strong>
+            <div>Prefix: {item.apiKeyPrefix ?? 'n/a'}</div>
+            <div>Endpoint: {item.endpoint}</div>
+            <div>Channel: {item.channelName ?? item.channelId ?? 'n/a'}</div>
+            <div>Status: {item.status}</div>
+            <div>HTTP: {item.httpStatus ?? 'n/a'}</div>
+            <div>Latency: {item.latencyMs ?? 'n/a'}</div>
+            <div>Trace: {item.traceId ?? 'n/a'}</div>
+            <div>Created: {new Date(item.createdAt).toISOString()}</div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function ChannelsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -140,6 +215,14 @@ function ChannelsPage() {
   const apiKeysQuery = useQuery({
     queryKey: apiKeysQueryKey,
     queryFn: () => listApiKeys(),
+  });
+  const analyticsQuery = useQuery({
+    queryKey: analyticsQueryKey,
+    queryFn: () => getAnalyticsSummaryRequest(),
+  });
+  const auditQuery = useQuery({
+    queryKey: auditQueryKey,
+    queryFn: () => listAuditRequests(),
   });
 
   const signOutMutation = useMutation({
@@ -179,6 +262,17 @@ function ChannelsPage() {
     mutationFn: (id: string) => revokeApiKeyRequest({ id }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: apiKeysQueryKey });
+      await queryClient.invalidateQueries({ queryKey: analyticsQueryKey });
+      await queryClient.invalidateQueries({ queryKey: auditQueryKey });
+    },
+  });
+  const rotateApiKeyMutation = useMutation({
+    mutationFn: (id: string) => rotateApiKeyRequest({ id }),
+    onSuccess: async (result) => {
+      setCreatedRawKey(result.rawKey);
+      await queryClient.invalidateQueries({ queryKey: apiKeysQueryKey });
+      await queryClient.invalidateQueries({ queryKey: analyticsQueryKey });
+      await queryClient.invalidateQueries({ queryKey: auditQueryKey });
     },
   });
 
@@ -194,6 +288,14 @@ function ChannelsPage() {
         {signOutMutation.isPending ? 'Signing out...' : 'Sign out'}
       </button>
       <p>Milestone 2 minimal channel management shell.</p>
+
+      {analyticsQuery.data ? <AnalyticsSection analytics={analyticsQuery.data} /> : null}
+      {analyticsQuery.isPending ? <p>Loading dashboard...</p> : null}
+      {analyticsQuery.error ? <p>Failed to load dashboard.</p> : null}
+
+      {auditQuery.data ? <AuditSection items={auditQuery.data} /> : null}
+      {auditQuery.isPending ? <p>Loading audit...</p> : null}
+      {auditQuery.error ? <p>Failed to load audit.</p> : null}
 
       <form
         onSubmit={(event) => {
@@ -320,6 +422,7 @@ function ChannelsPage() {
         </form>
         {createApiKeyMutation.error ? <p>Failed to issue API key.</p> : null}
         {revokeApiKeyMutation.error ? <p>Failed to revoke API key.</p> : null}
+        {rotateApiKeyMutation.error ? <p>Failed to rotate API key.</p> : null}
         {createdRawKey ? <p>Raw key: <code>{createdRawKey}</code></p> : null}
         {apiKeysQuery.isPending ? <p>Loading API keys...</p> : null}
         {apiKeysQuery.error ? <p>Failed to load API keys.</p> : null}
@@ -335,6 +438,9 @@ function ChannelsPage() {
               <div>Expires at: {apiKey.expiresAt ? new Date(apiKey.expiresAt).toISOString() : 'never'}</div>
               <button type="button" disabled={revokeApiKeyMutation.isPending || apiKey.status === 'revoked'} onClick={() => revokeApiKeyMutation.mutate(apiKey.id)}>
                 {apiKey.status === 'revoked' ? 'Revoked' : 'Revoke key'}
+              </button>
+              <button type="button" disabled={rotateApiKeyMutation.isPending || apiKey.status === 'revoked'} onClick={() => rotateApiKeyMutation.mutate(apiKey.id)}>
+                {rotateApiKeyMutation.isPending ? 'Rotating...' : 'Rotate key'}
               </button>
             </li>
           ))}

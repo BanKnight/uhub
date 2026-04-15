@@ -150,9 +150,9 @@
 - `settings.local.json` 里保留通用 `Bash(bun run:*)` 比维护一长串带 `cd` 的白名单更稳妥
 
 ## Current status
-- Milestone 7 已完成收尾；fresh `bun run typecheck`、`bun run build` 与目录级 TypeScript diagnostics 均通过
-- 当前 session 仅清理了自身 team state，且已无 active OMC mode
-- 等待用户指定下一里程碑或后续动作
+- Milestone 8 第二批已完成最小动态验证：rotate 后旧 key 返回 `401`、新 key 返回 `200`，analytics/audit 均可读取最新 requests 数据
+- 当前工作分支：`milestone-8-foundations`
+- 待做：把 M8 第二批结果提交为独立 commit，并决定是否继续补更细的 dashboard / 审计能力
 
 ### Milestone 7（API key revoke 最小生命周期）
 - `apps/api-worker/src/db/schema.ts` 补齐 Better Auth 所需 `user/session/account/verification` Drizzle schema，并纳入统一 `schema`
@@ -185,6 +185,6 @@
 - admin tRPC 若要依赖 cookie session，前端 tRPC link 必须显式带 `credentials: 'include'`，后端 `/trpc/*` 也必须返回带 credentials 的 CORS
 
 ## Current status
-- Milestone 7 已完成收尾；fresh `bun run typecheck`、`bun run build` 与目录级 TypeScript diagnostics 均通过
-- 当前 session 仅清理了自身 team state，且已无 active OMC mode
-- 等待用户指定下一里程碑或后续动作
+- Milestone 8 第二批已完成最小动态验证：rotate 后旧 key 返回 `401`、新 key 返回 `200`，analytics/audit 均可读取最新 requests 数据
+- 当前工作分支：`milestone-8-foundations`
+- 待做：把 M8 第二批结果提交为独立 commit，并决定是否继续补更细的 dashboard / 审计能力

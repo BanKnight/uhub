@@ -1,6 +1,6 @@
 import { desc, eq } from 'drizzle-orm';
-import type { GatewayEndpoint, GatewayRequestStatus, RequestHistoryItem } from '@uhub/shared';
-import { getDb, requests } from '../db/schema';
+import type { AuditRequestItem, GatewayEndpoint, GatewayRequestStatus, RequestHistoryItem } from '@uhub/shared';
+import { apiKeys, channels, getDb, requests } from '../db/schema';
 import type { WorkerEnv } from '../index';
 
 type CreateRequestRecordInput = {
@@ -63,6 +63,47 @@ export async function listRequestsByApiKey(env: WorkerEnv, apiKeyId: string): Pr
     responseSize: row.responseSize ?? null,
     startedAt: row.startedAt,
     finishedAt: row.finishedAt ?? null,
+    createdAt: row.createdAt,
+  }));
+}
+
+export async function listRecentRequestsForAdmin(env: WorkerEnv): Promise<AuditRequestItem[]> {
+  const db = getDb(env);
+  const rows = await db
+    .select({
+      id: requests.id,
+      apiKeyId: requests.apiKeyId,
+      apiKeyLabel: apiKeys.label,
+      apiKeyPrefix: apiKeys.keyPrefix,
+      channelId: requests.channelId,
+      channelName: channels.name,
+      endpoint: requests.endpoint,
+      model: requests.model,
+      traceId: requests.traceId,
+      status: requests.status,
+      httpStatus: requests.httpStatus,
+      latencyMs: requests.latencyMs,
+      createdAt: requests.createdAt,
+    })
+    .from(requests)
+    .leftJoin(apiKeys, eq(requests.apiKeyId, apiKeys.id))
+    .leftJoin(channels, eq(requests.channelId, channels.id))
+    .orderBy(desc(requests.createdAt))
+    .limit(20);
+
+  return rows.map((row) => ({
+    id: row.id,
+    apiKeyId: row.apiKeyId,
+    apiKeyLabel: row.apiKeyLabel ?? null,
+    apiKeyPrefix: row.apiKeyPrefix ?? null,
+    channelId: row.channelId ?? null,
+    channelName: row.channelName ?? null,
+    endpoint: row.endpoint as GatewayEndpoint,
+    model: row.model ?? null,
+    traceId: row.traceId ?? null,
+    status: row.status,
+    httpStatus: row.httpStatus ?? null,
+    latencyMs: row.latencyMs ?? null,
     createdAt: row.createdAt,
   }));
 }
