@@ -1,0 +1,9 @@
+{
+  "name": "@uhub/ui",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json --emitDeclarationOnly false",
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}

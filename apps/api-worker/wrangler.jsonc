@@ -1,0 +1,29 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "uhub-api-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-04-13",
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "API_KEY_CONCURRENCY",
+        "class_name": "ApiKeyConcurrencyDurableObject"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["ApiKeyConcurrencyDurableObject"]
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "uhub",
+      "database_id": "local-dev-placeholder",
+      "migrations_dir": "../../packages/db/migrations"
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "name": "uhub",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "echo \"Use bun run dev:admin | bun run dev:portal | bun run dev:api\"",
+    "dev:admin": "bun --cwd apps/admin-web dev",
+    "dev:portal": "bun --cwd apps/key-portal dev",
+    "dev:api": "bun --cwd apps/api-worker dev",
+    "build": "bun run build:packages && bun run build:apps",
+    "build:packages": "bun --cwd packages/shared build && bun --cwd packages/config build && bun --cwd packages/db build && bun --cwd packages/ui build",
+    "build:apps": "bun --cwd apps/admin-web build && bun --cwd apps/key-portal build && bun --cwd apps/api-worker build",
+    "typecheck": "bun run typecheck:packages && bun run typecheck:apps",
+    "typecheck:packages": "bun --cwd packages/shared typecheck && bun --cwd packages/config typecheck && bun --cwd packages/db typecheck && bun --cwd packages/ui typecheck",
+    "typecheck:apps": "bun --cwd apps/admin-web typecheck && bun --cwd apps/key-portal typecheck && bun --cwd apps/api-worker typecheck",
+    "lint": "biome check .",
+    "db:generate": "bun --cwd apps/api-worker drizzle-kit generate",
+    "db:migrate:local": "bun x wrangler d1 migrations apply DB --local --cwd apps/api-worker"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "typescript": "^5.8.3"
+  }
+}
