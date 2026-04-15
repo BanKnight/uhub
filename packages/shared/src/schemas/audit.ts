@@ -1,5 +1,9 @@
-import { z } from 'zod';
-import { gatewayEndpointSchema, gatewayRequestStatusSchema } from './gateway';
+import { z } from "zod";
+import {
+  gatewayEndpointSchema,
+  gatewayFailureClassSchema,
+  gatewayRequestStatusSchema,
+} from "./gateway";
 
 export const auditRequestItemSchema = z.object({
   id: z.string(),
@@ -12,6 +16,7 @@ export const auditRequestItemSchema = z.object({
   model: z.string().nullable(),
   traceId: z.string().nullable(),
   status: gatewayRequestStatusSchema,
+  failureClass: gatewayFailureClassSchema.nullable(),
   httpStatus: z.number().int().nullable(),
   latencyMs: z.number().int().nullable(),
   createdAt: z.number().int(),
@@ -20,6 +25,7 @@ export const auditRequestItemSchema = z.object({
 export const auditListInputSchema = z.object({
   endpoint: gatewayEndpointSchema.optional(),
   status: gatewayRequestStatusSchema.optional(),
+  failureClass: gatewayFailureClassSchema.optional(),
   apiKeyPrefix: z.string().trim().min(1).optional(),
   traceId: z.string().trim().min(1).optional(),
   limit: z.number().int().positive().max(100).optional(),

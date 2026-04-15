@@ -1,7 +1,14 @@
-import { and, desc, eq, like } from 'drizzle-orm';
-import type { AuditListInput, AuditRequestItem, GatewayEndpoint, GatewayRequestStatus, RequestHistoryItem } from '@uhub/shared';
-import { apiKeys, channels, getDb, requests } from '../db/schema';
-import type { WorkerEnv } from '../index';
+import type {
+  AuditListInput,
+  AuditRequestItem,
+  GatewayEndpoint,
+  GatewayFailureClass,
+  GatewayRequestStatus,
+  RequestHistoryItem,
+} from "@uhub/shared";
+import { and, desc, eq, like } from "drizzle-orm";
+import { apiKeys, channels, getDb, requests } from "../db/schema";
+import type { WorkerEnv } from "../index";
 
 type CreateRequestRecordInput = {
   apiKeyId: string;
@@ -15,12 +22,16 @@ type CreateRequestRecordInput = {
 type FinishRequestRecordInput = {
   id: string;
   status: GatewayRequestStatus;
-  httpStatus: number;
+  failureClass: GatewayFailureClass | null;
+  httpStatus: number | null;
   latencyMs: number;
   responseSize: number | null;
 };
 
-export async function createRequestRecord(env: WorkerEnv, input: CreateRequestRecordInput) {
+export async function createRequestRecord(
+  env: WorkerEnv,
+  input: CreateRequestRecordInput,
+) {
   const db = getDb(env);
   const now = Date.now();
   const id = crypto.randomUUID();
@@ -32,7 +43,8 @@ export async function createRequestRecord(env: WorkerEnv, input: CreateRequestRe
     model: input.model,
     channelId: input.channelId,
     traceId: input.traceId,
-    status: 'pending',
+    status: "pending",
+    failureClass: null,
     httpStatus: null,
     latencyMs: null,
     requestSize: input.requestSize,
@@ -46,9 +58,17 @@ export async function createRequestRecord(env: WorkerEnv, input: CreateRequestRe
   return { id, startedAt: now };
 }
 
-export async function listRequestsByApiKey(env: WorkerEnv, apiKeyId: string): Promise<RequestHistoryItem[]> {
+export async function listRequestsByApiKey(
+  env: WorkerEnv,
+  apiKeyId: string,
+): Promise<RequestHistoryItem[]> {
   const db = getDb(env);
-  const rows = await db.select().from(requests).where(eq(requests.apiKeyId, apiKeyId)).orderBy(desc(requests.createdAt)).limit(20);
+  const rows = await db
+    .select()
+    .from(requests)
+    .where(eq(requests.apiKeyId, apiKeyId))
+    .orderBy(desc(requests.createdAt))
+    .limit(20);
 
   return rows.map((row) => ({
     id: row.id,
@@ -57,6 +77,7 @@ export async function listRequestsByApiKey(env: WorkerEnv, apiKeyId: string): Pr
     channelId: row.channelId ?? null,
     traceId: row.traceId ?? null,
     status: row.status,
+    failureClass: row.failureClass ?? null,
     httpStatus: row.httpStatus ?? null,
     latencyMs: row.latencyMs ?? null,
     requestSize: row.requestSize ?? null,
@@ -67,12 +88,20 @@ export async function listRequestsByApiKey(env: WorkerEnv, apiKeyId: string): Pr
   }));
 }
 
-export async function listRecentRequestsForAdmin(env: WorkerEnv, input: AuditListInput = {}): Promise<AuditRequestItem[]> {
+export async function listRecentRequestsForAdmin(
+  env: WorkerEnv,
+  input: AuditListInput = {},
+): Promise<AuditRequestItem[]> {
   const db = getDb(env);
   const filters = [
     input.endpoint ? eq(requests.endpoint, input.endpoint) : undefined,
     input.status ? eq(requests.status, input.status) : undefined,
-    input.apiKeyPrefix ? like(apiKeys.keyPrefix, `${input.apiKeyPrefix}%`) : undefined,
+    input.failureClass
+      ? eq(requests.failureClass, input.failureClass)
+      : undefined,
+    input.apiKeyPrefix
+      ? like(apiKeys.keyPrefix, `${input.apiKeyPrefix}%`)
+      : undefined,
     input.traceId ? like(requests.traceId, `%${input.traceId}%`) : undefined,
   ].filter((value): value is NonNullable<typeof value> => value !== undefined);
   const rows = await db
@@ -87,6 +116,7 @@ export async function listRecentRequestsForAdmin(env: WorkerEnv, input: AuditLis
       model: requests.model,
       traceId: requests.traceId,
       status: requests.status,
+      failureClass: requests.failureClass,
       httpStatus: requests.httpStatus,
       latencyMs: requests.latencyMs,
       createdAt: requests.createdAt,
@@ -109,13 +139,17 @@ export async function listRecentRequestsForAdmin(env: WorkerEnv, input: AuditLis
     model: row.model ?? null,
     traceId: row.traceId ?? null,
     status: row.status,
+    failureClass: row.failureClass ?? null,
     httpStatus: row.httpStatus ?? null,
     latencyMs: row.latencyMs ?? null,
     createdAt: row.createdAt,
   }));
 }
 
-export async function finishRequestRecord(env: WorkerEnv, input: FinishRequestRecordInput) {
+export async function finishRequestRecord(
+  env: WorkerEnv,
+  input: FinishRequestRecordInput,
+) {
   const db = getDb(env);
   const finishedAt = Date.now();
 
@@ -123,6 +157,7 @@ export async function finishRequestRecord(env: WorkerEnv, input: FinishRequestRe
     .update(requests)
     .set({
       status: input.status,
+      failureClass: input.failureClass,
       httpStatus: input.httpStatus,
       latencyMs: input.latencyMs,
       responseSize: input.responseSize,

@@ -359,6 +359,31 @@
         "revoke 后 /portal/me 或 /portal/requests 返回 401，raw key gateway 鉴权失效",
         "验证结果被记录到 progress.txt"
       ]
+    },
+    {
+      "id": "V2-M1-US1",
+      "title": "硬化 OpenAI chat completions 热路径的 stream、timeout 与错误归类",
+      "priority": 31,
+      "passes": true,
+      "acceptanceCriteria": [
+        "apps/api-worker/src/routers/gateway/chat-completions.ts 在 stream=true 时不再整包读取上游响应，而是透传 text/event-stream 响应体",
+        "non-stream 请求仍返回与当前 OpenAI-compatible 路径兼容的 JSON/文本响应",
+        "gateway 返回统一错误结构，至少可区分 invalid_request、auth_error、upstream_error、upstream_timeout、network_error",
+        "requests 落库可记录失败归类，并保留 traceId、httpStatus、requestSize、responseSize"
+      ]
+    },
+    {
+      "id": "V2-M1-US2",
+      "title": "验证 OpenAI 热路径硬化的动态链路",
+      "priority": 32,
+      "passes": true,
+      "acceptanceCriteria": [
+        "apps/api-worker 与 packages/shared 的 typecheck/build 通过",
+        "stream=false 的 chat completions 请求可继续成功返回 200",
+        "stream=true 的 chat completions 请求可返回 text/event-stream 并透传上游分块",
+        "timeout 场景返回稳定错误结构，且对应 requests/audit 可辨认失败类型",
+        "验证结果被记录到 progress.txt"
+      ]
     }
   ]
 }

@@ -1,10 +1,7 @@
 {
   "name": "uhub",
   "private": true,
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
+  "workspaces": ["apps/*", "packages/*"],
   "scripts": {
     "dev": "echo \"Use bun run dev:admin | bun run dev:portal | bun run dev:api\"",
     "dev:admin": "bun --cwd apps/admin-web dev",
@@ -16,12 +13,24 @@
     "typecheck": "bun run typecheck:packages && bun run typecheck:apps",
     "typecheck:packages": "bun --cwd packages/shared typecheck && bun --cwd packages/config typecheck && bun --cwd packages/db typecheck && bun --cwd packages/ui typecheck",
     "typecheck:apps": "bun --cwd apps/admin-web typecheck && bun --cwd apps/key-portal typecheck && bun --cwd apps/api-worker typecheck",
-    "lint": "biome check .",
+    "format": "biome format --write .",
+    "format:check": "biome format --check .",
+    "lint": "biome lint .",
+    "lint:fix": "biome lint --write .",
+    "check": "bun run format:check && bun run lint && bun run typecheck && bun run build",
+    "prepare": "husky",
     "db:generate": "bun --cwd apps/api-worker drizzle-kit generate",
     "db:migrate:local": "bun x wrangler d1 migrations apply DB --local --cwd apps/api-worker"
   },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,json}": [
+      "biome check --write --no-errors-on-unmatched --files-ignore-unknown=true"
+    ]
+  },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.2",
     "typescript": "^5.8.3"
   }
 }

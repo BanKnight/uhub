@@ -185,6 +185,7 @@
 - admin tRPC 若要依赖 cookie session，前端 tRPC link 必须显式带 `credentials: 'include'`，后端 `/trpc/*` 也必须返回带 credentials 的 CORS
 
 ## Current status
-- Milestone 8 第二批已完成最小动态验证：rotate 后旧 key 返回 `401`、新 key 返回 `200`，analytics/audit 均可读取最新 requests 数据
-- 当前工作分支：`milestone-8-foundations`
-- 待做：把 M8 第二批结果提交为独立 commit，并决定是否继续补更细的 dashboard / 审计能力
+- v2 Milestone 1 已完成：OpenAI `/v1/chat/completions` 热路径现支持真正 SSE 透传、统一 gateway 错误结构与 timeout/network/upstream failure class 记录
+- 最新验证已通过：`bun run typecheck`、`bun run build`、non-stream 200、stream 200 + `text/event-stream` + `[DONE]`、timeout 504 + `upstream_timeout`，且 audit 可读到对应 failureClass
+- 本地动态验证使用 `http://127.0.0.1:8788` worker 与 `http://127.0.0.1:5001` mock upstream 完成
+- 待做：独立 reviewer pass、deslop、回归复验，然后决定是否进入 v2 Milestone 2（Claude-compatible 最小入口）
