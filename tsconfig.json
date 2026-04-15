@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022"],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@uhub/shared": ["packages/shared/src/index.ts"],
+      "@uhub/config": ["packages/config/src/index.ts"],
+      "@uhub/db": ["packages/db/src/index.ts"],
+      "@uhub/ui": ["packages/ui/src/index.ts"]
+    }
+  }
+}

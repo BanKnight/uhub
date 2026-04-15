@@ -1,0 +1,13 @@
+node_modules
+bun.lock
+dist
+.wrangler
+.DS_Store
+*.tsbuildinfo
+.claude/settings.local.json
+.claude/worktrees/
+.claude/skills/omc-reference/
+.omc/sessions/
+.omc/state/
+.omc/project-memory.json
+apps/**/.omc/

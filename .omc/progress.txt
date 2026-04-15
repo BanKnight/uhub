@@ -1,0 +1,190 @@
+# Ralph Progress
+
+## Session goal
+按 `/data/workspace/uhub/.omc/plans/2026-04-13-axonhub-cloudflare-implementation-plan.md` 串行执行，从 Milestone 0 开始。
+
+## Guardrails
+- 只按实施计划里程碑推进
+- 保持 YAGNI：不引入 multi-project、企业 RBAC、GraphQL、多 profile API key 系统
+- 当前阶段只做实现下一步所需的最小基础，不提前做业务扩展
+
+## Completed
+### Milestone 0
+- 建立了 bun monorepo 根配置：`package.json`、`bunfig.toml`、`tsconfig.json`、`biome.json`、`.gitignore`
+- 建立了三应用骨架：`apps/admin-web`、`apps/key-portal`、`apps/api-worker`
+- 建立了四个共享包骨架：`packages/shared`、`packages/config`、`packages/db`、`packages/ui`
+- 建立了基础测试目录：`tests/unit`、`tests/integration`、`tests/e2e`
+- 运行验证：
+  - `bun install` 成功
+  - `bun run typecheck` 成功
+  - `bun run build` 成功
+
+### Milestone 1（最小壳）
+- `apps/api-worker/package.json` 已加入 `better-auth`、`drizzle-orm`、`drizzle-kit`、`zod`
+- 新增 `apps/api-worker/src/auth/better-auth.ts`，用 `betterAuth + drizzleAdapter` 建立最小 admin auth 实例
+- 新增 `apps/api-worker/src/db/schema.ts`，落下首批 D1 schema 与 `getDb(env)`
+- 新增 `packages/db/migrations/0001_init.sql`，对应首批表与索引
+- 更新 `apps/api-worker/src/index.ts`，挂载 `/api/auth/*` 到 `auth.handler(request)`，保留 `/healthz`
+- 更新 `apps/api-worker/wrangler.jsonc`，补上 D1 binding 占位
+- 更新 `apps/admin-web/src/main.tsx` 为最小 admin auth shell 文案
+- 运行验证：
+  - `bun run typecheck` 成功
+  - `bun run build` 成功
+  - `api-worker` 仍可通过 TypeScript build
+
+### Milestone 2（channel 管理最小闭环）
+- `apps/api-worker/src/lib/trpc.ts` 补齐带 `env` 的 tRPC context，建立 admin router 最小接线
+- `apps/api-worker/src/routers/admin/channels.ts` 提供 `list/create/update/status` 过程
+- `apps/api-worker/src/services/channels.ts` 增加 channels 的 D1 查询、创建、更新、状态切换逻辑
+- `packages/shared/src/schemas/channels.ts` 补充 channel zod schema 与 `updateChannelStatusInputSchema`
+- `apps/admin-web/src/app.tsx` 建立 TanStack Router + Query 的 channels 页面，并完成最小 list/create/status toggle 闭环
+- `apps/admin-web/src/lib/api.ts` 改为最薄的 tRPC untyped client 包装
+- `apps/admin-web/package.json` 增加 `@trpc/client`
+- `apps/api-worker/wrangler.jsonc` 修正 D1 migration 配置到 `d1_databases[].migrations_dir`，并启用 `nodejs_compat`
+- 运行验证：
+  - `bun install` 成功
+  - `bun run typecheck` 成功
+  - `bun run build` 成功
+  - `bun run db:migrate:local` 成功应用 `0001_init.sql`
+  - `GET /healthz` 返回 `{ "ok": true }`
+  - `POST /trpc/admin.channels.create` 成功创建 channel
+  - `GET /trpc/admin.channels.list` 成功返回创建结果
+  - `POST /trpc/admin.channels.status` 成功将 channel 切换为 `disabled`
+  - 再次 `GET /trpc/admin.channels.list` 成功反映状态变化
+
+### Milestone 3（API key 签发与 portal exchange 最小闭环）
+- `packages/shared/src/schemas/api-keys.ts` 新增 API key create/list 与 portal exchange 所需 zod schema
+- `packages/shared/src/index.ts` 导出 API key 与 portal exchange schema/types
+- `apps/api-worker/src/services/api-keys.ts` 实现 raw key 生成、prefix/hash 持久化、规则落库、active channel 校验、按 raw key 查找
+- `apps/api-worker/src/services/portal-sessions.ts` 实现 portal session 创建逻辑
+- `apps/api-worker/src/routers/admin/api-keys.ts` 提供 `list/create` 最小 tRPC 过程，并要求 Better Auth admin session
+- `apps/api-worker/src/routers/portal/auth.ts` 提供 `/portal/auth/exchange`，成功时写 HttpOnly portal session cookie
+- `apps/api-worker/src/index.ts` 挂载 `/portal/auth/*` 并补充 credentials CORS；tRPC context 透传原始 Request 用于 admin session 校验
+- `apps/admin-web/src/lib/api.ts` 扩展 admin apiKeys 的 list/create 请求
+- `apps/admin-web/src/app.tsx` 增加最小 API key 签发与列表 UI，支持 label/channel/maxConcurrency/expiresAt
+- `apps/key-portal/src/main.tsx` 增加 raw key 登录页与 exchange 提交闭环
+- 运行验证：
+  - TypeScript 项目检查通过：`packages/shared`、`packages/config`、`packages/db`、`packages/ui`、`apps/api-worker`、`apps/admin-web`、`apps/key-portal`
+  - `POST /trpc/admin.apiKeys.create` 成功签发 raw key，并返回 prefix/hash 对应的最小展示对象
+  - `GET /trpc/admin.apiKeys.list` 成功返回已签发 key 列表
+  - `POST /portal/auth/exchange` 对有效 raw key 返回 200、session payload 和 `Set-Cookie`
+  - `POST /portal/auth/exchange` 对无效 raw key 返回 401
+  - disabled channel 上签发 API key 返回 400（`API keys can only be issued for active channels`）
+  - 未登录访问 `admin.apiKeys.list/create` 返回 401（`Admin authentication required`）
+  - `admin-web` 的 `vite build` 成功
+  - `key-portal` 的 `vite build` 成功
+
+## Learnings
+- Better Auth 的真实返回对象包含 `handler(request: Request)`，适合直接挂到 Hono 路由
+- Drizzle D1 的真实导出路径是 `drizzle-orm/d1`
+- Better Auth 的 Drizzle 适配器签名是 `drizzleAdapter(db, { provider: 'sqlite', schema })`
+- 现阶段先做“最小可编译接线”是对的；后面再补 admin 登录页与 auth client 的细节实现
+- Wrangler 4.81.1 的 D1 migration 路径配置不是顶层 `migrations_dir`，而是写在 `d1_databases[]` 项内
+- Better Auth 在 Cloudflare Worker 本地 dev 下需要 `nodejs_compat`，否则会出现 AsyncLocalStorage 能力告警
+- tRPC 裸 HTTP 调用时，当前这套路由的 input body 直接传业务对象即可，不需要额外包一层 `json`
+- API key 的“只能给 active channel 签发”必须落在后端服务层，而不应只依赖前端筛选
+
+### Milestone 4（Gateway MVP + 请求历史）
+- `packages/shared/src/schemas/gateway.ts` 新增 gateway route endpoint、chat completions 请求/响应与 request history schema
+- `packages/shared/src/schemas/api-keys.ts` 将 endpoint 规则命名收敛为协议入口维度：`openai_chat_completions`
+- `apps/api-worker/src/middleware/require-api-key.ts` 实现 raw key、endpoint allowlist、channel allowlist 的最小前置校验
+- `apps/api-worker/src/services/gateway/channels.ts` 实现 active channel 校验
+- `apps/api-worker/src/repositories/requests-repo.ts` 与 `apps/api-worker/src/services/request-log/request-log.ts` 实现 requests pending/finished 落库与 trace/body size 记录
+- `apps/api-worker/src/routers/gateway/chat-completions.ts` 挂载 `/v1/chat/completions`，支持 trace_id 透传/生成、上游转发、失败回写
+- `apps/api-worker/src/index.ts` 挂载 `/v1` 网关路由
+- 运行验证：
+  - `packages/shared` 的 `bun run typecheck` 成功
+  - `apps/api-worker` 的 `bun run typecheck` 成功
+  - `apps/admin-web` 的 `bun run typecheck` 成功
+  - `apps/api-worker` 的 `bun run build` 成功
+  - 无 bearer key 调用 `POST /v1/chat/completions` 返回 `401`
+  - 合法 key 调用 `POST /v1/chat/completions` 返回 `200`，`trace_id` 成功透传
+  - 上游不可达时 gateway 返回 `502`，对应 `requests` 记录写为 `failed`
+  - 成功路径对应 `requests` 记录写为 `completed`，并记录 `endpoint=openai_chat_completions`
+
+## Learnings
+- Better Auth / admin auth 与 gateway key auth 是两条独立身份链路，后续 `/anthropic` 入口应复用 gateway key auth，而不是复用 admin session
+- 在 AxonHub 复刻场景里，`endpoint` 更适合表达“客户端协议入口”（如 `/v1/chat/completions`、后续 `/anthropic`），不要和底层模型能力直接混用
+- gateway 请求日志必须在上游异常分支显式回写，否则 records 会卡在 `pending`
+
+### Milestone 5（Durable Objects 并发门禁）
+- `apps/api-worker/src/durable-objects/api-key-concurrency-do.ts` 新增 API key 级别 lease Durable Object，支持 acquire/release 与 TTL 清理
+- `apps/api-worker/src/lib/concurrency.ts` 新增 DO stub helper，按 `apiKeyId` 获取 lease 与释放 lease
+- `apps/api-worker/src/index.ts` 补上 `API_KEY_CONCURRENCY` 绑定类型与 DO 导出
+- `apps/api-worker/wrangler.jsonc` 增加 Durable Object binding 与 migration
+- `apps/api-worker/src/routers/gateway/chat-completions.ts` 在上游调用前 acquire lease，并在 finally 中释放 lease；超限时返回 `429`
+- 运行验证：
+  - `apps/api-worker` 的 `bun run typecheck` 成功
+  - `apps/api-worker` 的 `bun run build` 成功
+  - `wrangler dev` 本地成功加载 `env.API_KEY_CONCURRENCY`
+  - 在 `maxConcurrency=1` 且慢上游场景下，第一个请求 `trace-m5-concurrent-a` 返回 `200`
+  - 同时发起的第二个请求 `trace-m5-concurrent-b` 返回 `429`（`API key concurrency limit exceeded`）
+  - 第一个请求完成后，再次请求 `trace-m5-after-release` 返回 `200`，证明 lease 已释放
+
+## Learnings
+- 当前并发门禁最合适的插点是 `requireApiKey` 之后、真实上游 `fetch` 之前，这样不会污染 key 校验逻辑，也便于后续给 `/anthropic` 复用
+- 本地 Cloudflare Durable Object 在当前项目里使用“普通导出类 + (state, env) 构造签名”即可，不需要继承可实例化基类
+- `429` 是在 acquire 失败前返回的，因此当前实现不会为被拒绝的并发请求写入 `requests` 记录；如果后续要做审计，再单独补 rejected request 记录即可
+
+### Milestone 6（Portal 概览与历史页面）
+- `apps/api-worker/src/services/portal-sessions.ts` 增加 portal_session cookie 读取、session 有效性校验、api key active/expired 校验
+- `apps/api-worker/src/services/api-keys.ts` 导出 `getApiKeyById()` 供 portal 只读接口复用
+- `apps/api-worker/src/repositories/requests-repo.ts` 增加 `listRequestsByApiKey()`，返回最近 20 条请求历史
+- `apps/api-worker/src/routers/portal/me.ts` 提供 key 概览接口
+- `apps/api-worker/src/routers/portal/requests.ts` 提供最近请求历史接口
+- `apps/api-worker/src/index.ts` 挂载 `/portal/me` 与 `/portal/requests`
+- `apps/key-portal/src/main.tsx` 扩展为登录后 overview/history 最小单页
+- 运行验证：
+  - `apps/api-worker` 的 `bun run typecheck` 成功
+  - `apps/api-worker` 的 `bun run build` 成功
+  - `apps/key-portal` 的 `bun run typecheck` 成功
+  - `apps/key-portal` 的 `bun run build` 成功
+  - `POST /portal/auth/exchange` 对本地测试 key 返回 `200` 与 `Set-Cookie`
+  - `GET /portal/me` 携带 portal_session cookie 返回 `200`
+  - `GET /portal/requests` 携带 portal_session cookie 返回 `200`
+  - 将测试 key 置为 `disabled` 后，`GET /portal/me` 与 `GET /portal/requests` 均返回 `401`
+
+## Learnings
+- portal 的核心链路是 `portal_session -> api_key -> requests` 的只读投影，不需要引入额外状态管理或二次认证模型
+- `RequestHistoryItem` 已足够支撑 portal history MVP；老数据里仍可能存在早期 `chat_completions` endpoint 字符串，这是历史数据兼容问题，不阻塞当前链路
+- `settings.local.json` 里保留通用 `Bash(bun run:*)` 比维护一长串带 `cd` 的白名单更稳妥
+
+## Current status
+- Milestone 8 第二批已完成最小动态验证：rotate 后旧 key 返回 `401`、新 key 返回 `200`，analytics/audit 均可读取最新 requests 数据
+- 当前工作分支：`milestone-8-foundations`
+- 待做：把 M8 第二批结果提交为独立 commit，并决定是否继续补更细的 dashboard / 审计能力
+
+### Milestone 7（API key revoke 最小生命周期）
+- `apps/api-worker/src/db/schema.ts` 补齐 Better Auth 所需 `user/session/account/verification` Drizzle schema，并纳入统一 `schema`
+- `packages/db/migrations/0001_init.sql` 对齐首批全量 schema；新增 `packages/db/migrations/0002_admin_auth.sql` 为现有本地 D1 增量补齐 Better Auth 表与索引
+- `apps/api-worker/src/index.ts` 为 `/api/auth/*` 与 `/trpc/*` 开启带 credentials 的 CORS，允许 admin-web 本地 cookie 鉴权
+- `apps/api-worker/src/routers/admin/channels.ts` 改为 `adminProcedure`，使 channel 管理与 api key 管理统一受 Better Auth session 保护
+- `apps/admin-web/package.json` 增加 `better-auth` 客户端依赖
+- 新增 `apps/admin-web/src/lib/auth.ts`，使用 `createAuthClient` 对接 `http://localhost:8787/api/auth`
+- `apps/admin-web/src/lib/api.ts` 的 tRPC 请求显式带 `credentials: 'include'`
+- `apps/admin-web/src/app.tsx` 补齐最小 sign-in 路由与 Better Auth 登录/注册/登出闭环；未登录访问 `/` 会跳转 `/sign-in`
+- 运行验证：
+  - `bun install` 成功
+  - `bun run typecheck` 成功
+  - `bun run build` 成功
+  - 本地应用 `0002_admin_auth.sql` 后，`user/session/account/verification` 表已存在
+  - 未登录访问 `GET /trpc/admin.channels.list` 返回 `401 Admin authentication required`
+  - `POST /api/auth/sign-in/email` 成功建立 admin session，`GET /api/auth/get-session` 返回 `admin@example.com`
+  - 已登录状态下 `POST /trpc/admin.channels.create` 成功
+  - 已登录状态下 `POST /trpc/admin.apiKeys.create` 成功返回 raw key
+  - `POST /portal/auth/exchange` 在 revoke 前返回 `200`
+  - `POST /v1/chat/completions` 在 revoke 前返回 `200`
+  - `POST /trpc/admin.apiKeys.revoke` 成功将 key 置为 `revoked` 且写入 `revokedAt`
+  - `GET /trpc/admin.apiKeys.list` 在 revoke 后正确反映 `revoked` 状态
+  - `GET /portal/me` 与 `GET /portal/requests` 在 revoke 后均返回 `401`
+  - `POST /v1/chat/completions` 在 revoke 后返回 `401`
+
+## Learnings
+- M7 的真实前置条件不是 revoke 逻辑本身，而是 admin auth 真正落地；否则无法完成“通过 admin.apiKeys.revoke 验收”这条 PRD
+- Better Auth 在当前 D1/Drizzle 接法下需要显式存在 `user/session/account/verification` 表；只有挂 `/api/auth/*` 还不够
+- admin tRPC 若要依赖 cookie session，前端 tRPC link 必须显式带 `credentials: 'include'`，后端 `/trpc/*` 也必须返回带 credentials 的 CORS
+
+## Current status
+- Milestone 8 第二批已完成最小动态验证：rotate 后旧 key 返回 `401`、新 key 返回 `200`，analytics/audit 均可读取最新 requests 数据
+- 当前工作分支：`milestone-8-foundations`
+- 待做：把 M8 第二批结果提交为独立 commit，并决定是否继续补更细的 dashboard / 审计能力
