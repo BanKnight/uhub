@@ -266,7 +266,7 @@ function ChannelsPage() {
     queryFn: () => getAnalyticsSummaryRequest(),
   });
   const auditQuery = useQuery({
-    queryKey: [auditQueryKey, auditFilters],
+    queryKey: [...auditQueryKey, auditFilters],
     queryFn: () => listAuditRequests({
       status: auditFilters.status ? (auditFilters.status as 'pending' | 'processing' | 'completed' | 'failed' | 'rejected') : undefined,
       endpoint: auditFilters.endpoint ? (auditFilters.endpoint as 'openai_chat_completions') : undefined,
