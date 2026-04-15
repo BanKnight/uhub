@@ -2,6 +2,7 @@ import { createTRPCUntypedClient, httpBatchLink } from '@trpc/client';
 import type {
   AnalyticsSummary,
   ApiKey,
+  AuditListInput,
   AuditRequestItem,
   Channel,
   CreateApiKeyInput,
@@ -62,6 +63,6 @@ export function getAnalyticsSummary() {
   return client.query('admin.analytics.summary') as Promise<AnalyticsSummary>;
 }
 
-export function listAuditRequests() {
-  return client.query('admin.audit.list') as Promise<AuditRequestItem[]>;
+export function listAuditRequests(input: AuditListInput = {}) {
+  return client.query('admin.audit.list', input) as Promise<AuditRequestItem[]>;
 }

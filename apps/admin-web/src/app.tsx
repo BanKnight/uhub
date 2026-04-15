@@ -130,12 +130,14 @@ function AnalyticsSection({ analytics }: { analytics: AnalyticsSummary }) {
   return (
     <section>
       <h2>Dashboard</h2>
-      <p>Milestone 8 minimal analytics shell.</p>
+      <p>Milestone 8 analytics + lifecycle shell.</p>
       <ul>
         <li>Total requests: {analytics.totalRequests}</li>
         <li>Completed: {analytics.completedRequests}</li>
         <li>Failed: {analytics.failedRequests}</li>
         <li>Rejected: {analytics.rejectedRequests}</li>
+        <li>Avg latency: {analytics.avgLatencyMs ?? 'n/a'}</li>
+        <li>Success rate: {analytics.successRate === null ? 'n/a' : `${(analytics.successRate * 100).toFixed(1)}%`}</li>
       </ul>
 
       <h3>By endpoint</h3>
@@ -149,6 +151,7 @@ function AnalyticsSection({ analytics }: { analytics: AnalyticsSummary }) {
             <div>Failed: {item.failedRequests}</div>
             <div>Rejected: {item.rejectedRequests}</div>
             <div>Avg latency: {item.avgLatencyMs ?? 'n/a'}</div>
+            <div>Success rate: {item.successRate === null ? 'n/a' : `${(item.successRate * 100).toFixed(1)}%`}</div>
           </li>
         ))}
       </ul>
@@ -165,6 +168,7 @@ function AnalyticsSection({ analytics }: { analytics: AnalyticsSummary }) {
             <div>Failed: {item.failedRequests}</div>
             <div>Rejected: {item.rejectedRequests}</div>
             <div>Avg latency: {item.avgLatencyMs ?? 'n/a'}</div>
+            <div>Success rate: {item.successRate === null ? 'n/a' : `${(item.successRate * 100).toFixed(1)}%`}</div>
           </li>
         ))}
       </ul>
@@ -172,10 +176,45 @@ function AnalyticsSection({ analytics }: { analytics: AnalyticsSummary }) {
   );
 }
 
-function AuditSection({ items }: { items: AuditRequestItem[] }) {
+function AuditSection({
+  items,
+  filters,
+  setFilters,
+}: {
+  items: AuditRequestItem[];
+  filters: { status: string; endpoint: string; apiKeyPrefix: string; traceId: string };
+  setFilters: React.Dispatch<React.SetStateAction<{ status: string; endpoint: string; apiKeyPrefix: string; traceId: string }>>;
+}) {
   return (
     <section>
       <h2>Audit</h2>
+      <div>
+        <label htmlFor="audit-status">Status</label>
+        <select id="audit-status" value={filters.status} onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}>
+          <option value="">All</option>
+          <option value="pending">pending</option>
+          <option value="processing">processing</option>
+          <option value="completed">completed</option>
+          <option value="failed">failed</option>
+          <option value="rejected">rejected</option>
+        </select>
+      </div>
+      <div>
+        <label htmlFor="audit-endpoint">Endpoint</label>
+        <select id="audit-endpoint" value={filters.endpoint} onChange={(event) => setFilters((current) => ({ ...current, endpoint: event.target.value }))}>
+          <option value="">All</option>
+          <option value="openai_chat_completions">openai_chat_completions</option>
+        </select>
+      </div>
+      <div>
+        <label htmlFor="audit-prefix">Key prefix</label>
+        <input id="audit-prefix" value={filters.apiKeyPrefix} onChange={(event) => setFilters((current) => ({ ...current, apiKeyPrefix: event.target.value }))} />
+      </div>
+      <div>
+        <label htmlFor="audit-trace">Trace</label>
+        <input id="audit-trace" value={filters.traceId} onChange={(event) => setFilters((current) => ({ ...current, traceId: event.target.value }))} />
+      </div>
+
       {items.length === 0 ? <p>No audit requests yet.</p> : null}
       <ul>
         {items.map((item) => (
@@ -203,6 +242,12 @@ function ChannelsPage() {
   const [apiKeyForm, setApiKeyForm] = React.useState<CreateApiKeyInput>(initialApiKeyForm);
   const [expiresAtInput, setExpiresAtInput] = React.useState('');
   const [createdRawKey, setCreatedRawKey] = React.useState<string | null>(null);
+  const [auditFilters, setAuditFilters] = React.useState({
+    status: '',
+    endpoint: '',
+    apiKeyPrefix: '',
+    traceId: '',
+  });
 
   const sessionQuery = useQuery({
     queryKey: sessionQueryKey,
@@ -221,8 +266,13 @@ function ChannelsPage() {
     queryFn: () => getAnalyticsSummaryRequest(),
   });
   const auditQuery = useQuery({
-    queryKey: auditQueryKey,
-    queryFn: () => listAuditRequests(),
+    queryKey: [auditQueryKey, auditFilters],
+    queryFn: () => listAuditRequests({
+      status: auditFilters.status ? (auditFilters.status as 'pending' | 'processing' | 'completed' | 'failed' | 'rejected') : undefined,
+      endpoint: auditFilters.endpoint ? (auditFilters.endpoint as 'openai_chat_completions') : undefined,
+      apiKeyPrefix: auditFilters.apiKeyPrefix || undefined,
+      traceId: auditFilters.traceId || undefined,
+    }),
   });
 
   const signOutMutation = useMutation({
@@ -293,7 +343,7 @@ function ChannelsPage() {
       {analyticsQuery.isPending ? <p>Loading dashboard...</p> : null}
       {analyticsQuery.error ? <p>Failed to load dashboard.</p> : null}
 
-      {auditQuery.data ? <AuditSection items={auditQuery.data} /> : null}
+      {auditQuery.data ? <AuditSection items={auditQuery.data} filters={auditFilters} setFilters={setAuditFilters} /> : null}
       {auditQuery.isPending ? <p>Loading audit...</p> : null}
       {auditQuery.error ? <p>Failed to load audit.</p> : null}
 

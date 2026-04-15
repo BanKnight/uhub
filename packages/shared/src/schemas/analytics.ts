@@ -3,6 +3,8 @@ import { gatewayEndpointSchema } from './gateway';
 
 const analyticsCountSchema = z.number().int().nonnegative();
 
+const successRateSchema = z.number().min(0).max(1).nullable();
+
 export const endpointAnalyticsItemSchema = z.object({
   endpoint: gatewayEndpointSchema,
   totalRequests: analyticsCountSchema,
@@ -10,6 +12,7 @@ export const endpointAnalyticsItemSchema = z.object({
   failedRequests: analyticsCountSchema,
   rejectedRequests: analyticsCountSchema,
   avgLatencyMs: z.number().int().nullable(),
+  successRate: successRateSchema,
 });
 
 export const channelAnalyticsItemSchema = z.object({
@@ -20,6 +23,7 @@ export const channelAnalyticsItemSchema = z.object({
   failedRequests: analyticsCountSchema,
   rejectedRequests: analyticsCountSchema,
   avgLatencyMs: z.number().int().nullable(),
+  successRate: successRateSchema,
 });
 
 export const analyticsSummarySchema = z.object({
@@ -27,6 +31,8 @@ export const analyticsSummarySchema = z.object({
   completedRequests: analyticsCountSchema,
   failedRequests: analyticsCountSchema,
   rejectedRequests: analyticsCountSchema,
+  avgLatencyMs: z.number().int().nullable(),
+  successRate: successRateSchema,
   endpointBreakdown: z.array(endpointAnalyticsItemSchema),
   channelBreakdown: z.array(channelAnalyticsItemSchema),
 });

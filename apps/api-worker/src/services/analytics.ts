@@ -13,6 +13,14 @@ function toNullableNumber(value: number | null) {
   return value === null ? null : Number(value);
 }
 
+function toSuccessRate(completedRequests: number, totalRequests: number) {
+  if (totalRequests === 0) {
+    return null;
+  }
+
+  return completedRequests / totalRequests;
+}
+
 async function listEndpointAnalytics(env: WorkerEnv): Promise<EndpointAnalyticsItem[]> {
   const db = getDb(env);
   const rows = await db
@@ -35,6 +43,7 @@ async function listEndpointAnalytics(env: WorkerEnv): Promise<EndpointAnalyticsI
     failedRequests: row.failedRequests,
     rejectedRequests: row.rejectedRequests,
     avgLatencyMs: toNullableNumber(row.avgLatencyMs),
+    successRate: toSuccessRate(row.completedRequests, row.totalRequests),
   }));
 }
 
@@ -64,6 +73,7 @@ async function listChannelAnalytics(env: WorkerEnv): Promise<ChannelAnalyticsIte
     failedRequests: row.failedRequests,
     rejectedRequests: row.rejectedRequests,
     avgLatencyMs: toNullableNumber(row.avgLatencyMs),
+    successRate: toSuccessRate(row.completedRequests, row.totalRequests),
   }));
 }
 
@@ -75,6 +85,7 @@ export async function getAnalyticsSummary(env: WorkerEnv): Promise<AnalyticsSumm
       completedRequests: completedRequestsExpr,
       failedRequests: failedRequestsExpr,
       rejectedRequests: rejectedRequestsExpr,
+      avgLatencyMs: avgLatencyMsExpr,
     })
     .from(requests);
   const [endpointBreakdown, channelBreakdown] = await Promise.all([
@@ -82,11 +93,16 @@ export async function getAnalyticsSummary(env: WorkerEnv): Promise<AnalyticsSumm
     listChannelAnalytics(env),
   ]);
 
+  const totalRequests = overview?.totalRequests ?? 0;
+  const completedRequests = overview?.completedRequests ?? 0;
+
   return {
-    totalRequests: overview?.totalRequests ?? 0,
-    completedRequests: overview?.completedRequests ?? 0,
+    totalRequests,
+    completedRequests,
     failedRequests: overview?.failedRequests ?? 0,
     rejectedRequests: overview?.rejectedRequests ?? 0,
+    avgLatencyMs: toNullableNumber(overview?.avgLatencyMs ?? null),
+    successRate: toSuccessRate(completedRequests, totalRequests),
     endpointBreakdown,
     channelBreakdown,
   };

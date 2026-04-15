@@ -1,5 +1,5 @@
-import { desc, eq } from 'drizzle-orm';
-import type { AuditRequestItem, GatewayEndpoint, GatewayRequestStatus, RequestHistoryItem } from '@uhub/shared';
+import { and, desc, eq, like } from 'drizzle-orm';
+import type { AuditListInput, AuditRequestItem, GatewayEndpoint, GatewayRequestStatus, RequestHistoryItem } from '@uhub/shared';
 import { apiKeys, channels, getDb, requests } from '../db/schema';
 import type { WorkerEnv } from '../index';
 
@@ -67,8 +67,14 @@ export async function listRequestsByApiKey(env: WorkerEnv, apiKeyId: string): Pr
   }));
 }
 
-export async function listRecentRequestsForAdmin(env: WorkerEnv): Promise<AuditRequestItem[]> {
+export async function listRecentRequestsForAdmin(env: WorkerEnv, input: AuditListInput = {}): Promise<AuditRequestItem[]> {
   const db = getDb(env);
+  const filters = [
+    input.endpoint ? eq(requests.endpoint, input.endpoint) : undefined,
+    input.status ? eq(requests.status, input.status) : undefined,
+    input.apiKeyPrefix ? like(apiKeys.keyPrefix, `${input.apiKeyPrefix}%`) : undefined,
+    input.traceId ? like(requests.traceId, `%${input.traceId}%`) : undefined,
+  ].filter((value): value is NonNullable<typeof value> => value !== undefined);
   const rows = await db
     .select({
       id: requests.id,
@@ -88,8 +94,9 @@ export async function listRecentRequestsForAdmin(env: WorkerEnv): Promise<AuditR
     .from(requests)
     .leftJoin(apiKeys, eq(requests.apiKeyId, apiKeys.id))
     .leftJoin(channels, eq(requests.channelId, channels.id))
+    .where(filters.length > 0 ? and(...filters) : undefined)
     .orderBy(desc(requests.createdAt))
-    .limit(20);
+    .limit(input.limit ?? 20);
 
   return rows.map((row) => ({
     id: row.id,

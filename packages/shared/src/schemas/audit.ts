@@ -17,4 +17,13 @@ export const auditRequestItemSchema = z.object({
   createdAt: z.number().int(),
 });
 
+export const auditListInputSchema = z.object({
+  endpoint: gatewayEndpointSchema.optional(),
+  status: gatewayRequestStatusSchema.optional(),
+  apiKeyPrefix: z.string().trim().min(1).optional(),
+  traceId: z.string().trim().min(1).optional(),
+  limit: z.number().int().positive().max(100).optional(),
+});
+
 export type AuditRequestItem = z.infer<typeof auditRequestItemSchema>;
+export type AuditListInput = z.infer<typeof auditListInputSchema>;
