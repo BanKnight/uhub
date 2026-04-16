@@ -43,6 +43,10 @@ export const anthropicMessagesRequestSchema = z.object({
   max_tokens: z.number().int().positive(),
   system: z.string().min(1).optional(),
   temperature: z.number().min(0).max(1).optional(),
+  top_p: z.number().min(0).max(1).optional(),
+  top_k: z.number().int().positive().optional(),
+  stop_sequences: z.array(z.string().min(1)).max(4).optional(),
+  metadata: z.record(z.string(), z.string()).optional(),
   stream: z.boolean().optional(),
 });
 
@@ -110,6 +114,11 @@ export const anthropicTextBlockSchema = z.object({
   text: z.string(),
 });
 
+export const anthropicUsageSchema = z.object({
+  input_tokens: z.number().int().nonnegative(),
+  output_tokens: z.number().int().nonnegative(),
+});
+
 export const anthropicMessagesResponseSchema = z.object({
   id: z.string(),
   type: z.literal("message"),
@@ -118,6 +127,7 @@ export const anthropicMessagesResponseSchema = z.object({
   content: z.array(anthropicTextBlockSchema),
   stop_reason: z.string().nullable(),
   stop_sequence: z.string().nullable(),
+  usage: anthropicUsageSchema,
 });
 
 export type GatewayEndpoint = z.infer<typeof gatewayEndpointSchema>;
@@ -135,6 +145,7 @@ export type RequestHistoryItem = z.infer<typeof requestHistoryItemSchema>;
 export type ChatCompletionsResponse = z.infer<
   typeof chatCompletionsResponseSchema
 >;
+export type AnthropicUsage = z.infer<typeof anthropicUsageSchema>;
 export type AnthropicMessagesResponse = z.infer<
   typeof anthropicMessagesResponseSchema
 >;

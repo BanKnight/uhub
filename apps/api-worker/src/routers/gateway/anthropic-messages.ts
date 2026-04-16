@@ -1,5 +1,6 @@
 import {
   type AnthropicMessage,
+  type AnthropicUsage,
   type ChatMessage,
   anthropicMessagesRequestSchema,
   chatCompletionsResponseSchema,
@@ -50,6 +51,48 @@ function mapFinishReasonToStopReason(finishReason: string | null | undefined) {
   return finishReason ?? "end_turn";
 }
 
+function applyStopSequences(text: string, stopSequences: string[] | undefined) {
+  if (!stopSequences || stopSequences.length === 0) {
+    return {
+      text,
+      stopSequence: null,
+    };
+  }
+
+  for (const stopSequence of stopSequences) {
+    const index = text.indexOf(stopSequence);
+    if (index !== -1) {
+      return {
+        text: text.slice(0, index),
+        stopSequence,
+      };
+    }
+  }
+
+  return {
+    text,
+    stopSequence: null,
+  };
+}
+
+function estimateAnthropicUsage(input: {
+  requestBody: string;
+  responseText: string;
+}): AnthropicUsage {
+  const encoder = new TextEncoder();
+
+  return {
+    input_tokens: Math.max(
+      1,
+      Math.ceil(encoder.encode(input.requestBody).byteLength / 4),
+    ),
+    output_tokens: Math.max(
+      1,
+      Math.ceil(encoder.encode(input.responseText).byteLength / 4),
+    ),
+  };
+}
+
 function encodeAnthropicEvent(event: string, data: unknown) {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 }
@@ -73,6 +116,8 @@ function createAnthropicStreamResponse(input: {
   upstreamResponse: Response;
   traceId: string;
   fallbackModel: string;
+  requestBody: string;
+  stopSequences: string[] | undefined;
 }) {
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
@@ -83,6 +128,12 @@ function createAnthropicStreamResponse(input: {
   let responseModel = input.fallbackModel;
   let responseId = crypto.randomUUID();
   let stopReason: string | null = null;
+  let matchedStopSequence: string | null = null;
+  let emittedText = "";
+  const usage = estimateAnthropicUsage({
+    requestBody: input.requestBody,
+    responseText: "",
+  });
 
   const emit = (
     controller: ReadableStreamDefaultController<Uint8Array>,
@@ -109,10 +160,7 @@ function createAnthropicStreamResponse(input: {
         model: responseModel,
         stop_reason: null,
         stop_sequence: null,
-        usage: {
-          input_tokens: 0,
-          output_tokens: 0,
-        },
+        usage,
       },
     });
     messageStarted = true;
@@ -155,11 +203,9 @@ function createAnthropicStreamResponse(input: {
       type: "message_delta",
       delta: {
         stop_reason: stopReason ?? "end_turn",
-        stop_sequence: null,
+        stop_sequence: matchedStopSequence,
       },
-      usage: {
-        output_tokens: 0,
-      },
+      usage,
     });
     emit(controller, "message_stop", {
       type: "message_stop",
@@ -171,6 +217,10 @@ function createAnthropicStreamResponse(input: {
     controller: ReadableStreamDefaultController<Uint8Array>,
     block: string,
   ) => {
+    if (messageStopped) {
+      return;
+    }
+
     const data = readSseDataBlock(block);
     if (!data) {
       return;
@@ -210,15 +260,34 @@ function createAnthropicStreamResponse(input: {
     const text =
       typeof choice?.delta?.content === "string" ? choice.delta.content : null;
     if (text && text.length > 0) {
-      startContentBlock(controller);
-      emit(controller, "content_block_delta", {
-        type: "content_block_delta",
-        index: 0,
-        delta: {
-          type: "text_delta",
-          text,
-        },
-      });
+      const nextText = emittedText + text;
+      const stopMatch = applyStopSequences(nextText, input.stopSequences);
+      const textDelta = stopMatch.text.slice(emittedText.length);
+
+      emittedText = stopMatch.text;
+      usage.output_tokens = Math.max(
+        1,
+        Math.ceil(new TextEncoder().encode(emittedText).byteLength / 4),
+      );
+
+      if (textDelta.length > 0) {
+        startContentBlock(controller);
+        emit(controller, "content_block_delta", {
+          type: "content_block_delta",
+          index: 0,
+          delta: {
+            type: "text_delta",
+            text: textDelta,
+          },
+        });
+      }
+
+      if (stopMatch.stopSequence) {
+        matchedStopSequence = stopMatch.stopSequence;
+        stopReason = "stop_sequence";
+        stopMessage(controller);
+        return;
+      }
     }
 
     if (choice?.finish_reason) {
@@ -313,7 +382,10 @@ anthropicMessagesRouter.post("/v1/messages", async (c) => {
   const upstreamBody = JSON.stringify({
     model: parsed.data.model,
     messages: toOpenAiMessages(parsed.data.system, parsed.data.messages),
+    max_tokens: parsed.data.max_tokens,
     temperature: parsed.data.temperature,
+    top_p: parsed.data.top_p,
+    stop: parsed.data.stop_sequences,
     stream: parsed.data.stream === true,
   });
 
@@ -329,6 +401,8 @@ anthropicMessagesRouter.post("/v1/messages", async (c) => {
         upstreamResponse,
         traceId: upstreamTraceId,
         fallbackModel: parsed.data.model,
+        requestBody: rawBody,
+        stopSequences: parsed.data.stop_sequences,
       }),
     onSuccess: ({ responseBody, traceId: upstreamTraceId }) => {
       let parsedJson: unknown;
@@ -358,6 +432,11 @@ anthropicMessagesRouter.post("/v1/messages", async (c) => {
         .map((choice) => choice.message.content)
         .filter((value) => value.length > 0)
         .join("\n");
+      const stopMatch = applyStopSequences(text, parsed.data.stop_sequences);
+      const usage = estimateAnthropicUsage({
+        requestBody: rawBody,
+        responseText: stopMatch.text,
+      });
 
       return new Response(
         JSON.stringify({
@@ -365,12 +444,14 @@ anthropicMessagesRouter.post("/v1/messages", async (c) => {
           type: "message",
           role: "assistant",
           model: parsedResponse.data.model,
-          content: [{ type: "text", text }],
-          stop_reason:
-            mapFinishReasonToStopReason(
-              parsedResponse.data.choices[0]?.finishReason,
-            ) ?? "end_turn",
-          stop_sequence: null,
+          content: [{ type: "text", text: stopMatch.text }],
+          stop_reason: stopMatch.stopSequence
+            ? "stop_sequence"
+            : (mapFinishReasonToStopReason(
+                parsedResponse.data.choices[0]?.finishReason,
+              ) ?? "end_turn"),
+          stop_sequence: stopMatch.stopSequence,
+          usage,
         }),
         {
           status: 200,

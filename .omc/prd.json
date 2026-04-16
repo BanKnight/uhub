@@ -432,6 +432,18 @@
         "刚失败的 channel 会进入短暂冷却期，后续请求会优先跳过它",
         "同一次请求仍只保留一条 requests/audit 记录，并反映最终成功 channel"
       ]
+    },
+    {
+      "id": "V2-M3-US2",
+      "title": "补齐 Anthropic messages 的常用协议字段与 stop/usage 语义",
+      "priority": 37,
+      "passes": true,
+      "acceptanceCriteria": [
+        "`/anthropic/v1/messages` 请求至少接受并处理 `max_tokens`、`top_p`、`stop_sequences`、`metadata` 等常用字段（允许最小透传或本地兼容）",
+        "non-stream 响应包含 `usage`，且在命中 stop sequence 时返回 `stop_reason=stop_sequence` 与对应 `stop_sequence`",
+        "stream 响应中的 `message_start`/`message_delta` 带有 `usage`，并在命中 stop sequence 时返回正确的 `stop_reason` 与 `stop_sequence`",
+        "对应动态验证结果被记录到 progress.txt"
+      ]
     }
   ]
 }

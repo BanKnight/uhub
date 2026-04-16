@@ -188,5 +188,6 @@
 - v2 Milestone 3 已完成最小 health-aware routing：gateway 现可在同一个 API key 允许多个 channel 时按优先级尝试，并对 upstream 5xx / timeout / network error 做最小跨 channel failover
 - 最新验证已通过：`apps/api-worker`、`packages/shared`、`apps/admin-web` 的 TypeScript 静态检查通过；并在 `http://127.0.0.1:8791` worker + `5005/5006` 双 mock upstream 上完成 failover 动态验证
 - 动态验证结果：第一次请求 `trace-failover-first` 先命中 primary 503，再自动切到 secondary 返回 `200 served-by-secondary-1`；第二次请求 `trace-failover-second` 直接命中 secondary 返回 `200 served-by-secondary-2`；计数显示 `primaryHits=1`、`secondaryHits=2`，证明失败 channel 已被短期冷却跳过
-- audit 记录显示两次请求最终都落到 `channelName=failover-secondary`、`status=completed`、`httpStatus=200`
-- 待做：如要继续 v2，下一个自然阶段是补更完整 health persistence / richer retry policy / channel scoring，或回头补更细的 Anthropic usage/event coverage
+- Anthropic protocol 兼容层已进一步补齐：`/anthropic/v1/messages` 现支持 `max_tokens`、`top_p`、`stop_sequences`、`metadata` 等常用字段；non-stream/stream 响应都包含 `usage`，命中 stop sequence 时会返回 `stop_reason=stop_sequence` 与对应 `stop_sequence`
+- 最新 Anthropic 协议验证结果：`trace-anthropic-protocol-nonstream-2` 返回 `text=Hello`、`stop_reason=stop_sequence`、`stop_sequence=<STOP>`、`usage={input_tokens:59,output_tokens:2}`；`trace-anthropic-protocol-stream-2` 返回 `text/event-stream`，`text_deltas=[Hello]`、`stop_reason=stop_sequence`、`stop_sequence=<STOP>`、`usage={input_tokens:63,output_tokens:2}`
+- 待做：如要继续 v2，下一个自然阶段是补更完整 Anthropic event coverage / tool use / message content block types，或进一步持久化 health / scoring / retry policy
