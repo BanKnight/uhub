@@ -23,6 +23,7 @@ export type RequestLogFinishInput = {
   startedAt: number;
   status: GatewayRequestStatus;
   failureClass: GatewayFailureClass | null;
+  channelId?: string | null;
   httpStatus: number | null;
   responseBody: string | null;
   responseSize?: number | null;
@@ -52,6 +53,7 @@ export function finishRequestLog(env: WorkerEnv, input: RequestLogFinishInput) {
     id: input.id,
     status: input.status,
     failureClass: input.failureClass,
+    channelId: input.channelId,
     httpStatus: input.httpStatus,
     latencyMs: Date.now() - input.startedAt,
     responseSize: input.responseSize ?? getBodySize(input.responseBody),

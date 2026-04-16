@@ -420,6 +420,18 @@
         "文本增量可通过 `content_block_delta.delta.type=text_delta` 正常输出，结束原因会映射到 Claude 风格 `stop_reason`",
         "request log / audit 继续记录 `endpoint=anthropic_messages`、traceId、status 与 httpStatus"
       ]
+    },
+    {
+      "id": "V2-M3-US1",
+      "title": "增加最小 health-aware routing 与跨 channel failover",
+      "priority": 36,
+      "passes": true,
+      "acceptanceCriteria": [
+        "当同一个 API key 允许多个 active channel 时，gateway 会按优先级顺序尝试 channel，而不是固定只用第一个 channel",
+        "对 timeout、network error 与 upstream 5xx，gateway 可在仍未回包前自动切到下一个允许 channel 重试",
+        "刚失败的 channel 会进入短暂冷却期，后续请求会优先跳过它",
+        "同一次请求仍只保留一条 requests/audit 记录，并反映最终成功 channel"
+      ]
     }
   ]
 }

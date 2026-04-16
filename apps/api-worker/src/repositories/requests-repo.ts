@@ -23,6 +23,7 @@ type FinishRequestRecordInput = {
   id: string;
   status: GatewayRequestStatus;
   failureClass: GatewayFailureClass | null;
+  channelId?: string | null;
   httpStatus: number | null;
   latencyMs: number;
   responseSize: number | null;
@@ -158,6 +159,7 @@ export async function finishRequestRecord(
     .set({
       status: input.status,
       failureClass: input.failureClass,
+      channelId: input.channelId ?? null,
       httpStatus: input.httpStatus,
       latencyMs: input.latencyMs,
       responseSize: input.responseSize,
