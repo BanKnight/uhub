@@ -1,6 +1,7 @@
 import {
   type AnthropicMessage,
   type AnthropicUsage,
+  type ChatCompletionsResponse,
   type ChatMessage,
   anthropicMessagesRequestSchema,
   chatCompletionsResponseSchema,
@@ -15,16 +16,48 @@ const ANTHROPIC_MESSAGES_ENDPOINT = "anthropic_messages";
 
 export const anthropicMessagesRouter = new Hono<{ Bindings: WorkerEnv }>();
 
+function normalizeAnthropicTextBlocks(
+  blocks: Array<{ type: "text"; text: string }>,
+) {
+  return blocks.map((block) => block.text).join("\n");
+}
+
 function normalizeAnthropicContent(content: AnthropicMessage["content"]) {
   if (typeof content === "string") {
     return content;
   }
 
-  return content.map((block) => block.text).join("\n");
+  return content
+    .map((block) => {
+      if (block.type === "text") {
+        return block.text;
+      }
+
+      const toolResultContent =
+        typeof block.content === "string"
+          ? block.content
+          : normalizeAnthropicTextBlocks(block.content);
+      return `[tool_result:${block.tool_use_id}] ${toolResultContent}`;
+    })
+    .join("\n");
+}
+
+function normalizeAnthropicSystem(
+  system: string | Array<{ type: "text"; text: string }> | undefined,
+) {
+  if (!system) {
+    return undefined;
+  }
+
+  if (typeof system === "string") {
+    return system;
+  }
+
+  return normalizeAnthropicTextBlocks(system);
 }
 
 function toOpenAiMessages(
-  system: string | undefined,
+  system: string | Array<{ type: "text"; text: string }> | undefined,
   messages: AnthropicMessage[],
 ): ChatMessage[] {
   const normalizedMessages = messages.map((message) => ({
@@ -32,11 +65,13 @@ function toOpenAiMessages(
     content: normalizeAnthropicContent(message.content),
   })) satisfies ChatMessage[];
 
-  if (!system) {
+  const normalizedSystem = normalizeAnthropicSystem(system);
+
+  if (!normalizedSystem) {
     return normalizedMessages;
   }
 
-  return [{ role: "system", content: system }, ...normalizedMessages];
+  return [{ role: "system", content: normalizedSystem }, ...normalizedMessages];
 }
 
 function mapFinishReasonToStopReason(finishReason: string | null | undefined) {
@@ -46,6 +81,10 @@ function mapFinishReasonToStopReason(finishReason: string | null | undefined) {
 
   if (finishReason === "length") {
     return "max_tokens";
+  }
+
+  if (finishReason === "tool_calls") {
+    return "tool_use";
   }
 
   return finishReason ?? "end_turn";
@@ -93,6 +132,63 @@ function estimateAnthropicUsage(input: {
   };
 }
 
+function parseToolUseInput(argumentsText: string) {
+  if (!argumentsText.trim()) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(argumentsText) as unknown;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+
+    return { value: parsed };
+  } catch {
+    return { raw: argumentsText };
+  }
+}
+
+function toAnthropicResponseContent(
+  message: ChatCompletionsResponse["choices"][number]["message"],
+  stopSequences: string[] | undefined,
+) {
+  const text = typeof message.content === "string" ? message.content : "";
+  const stopMatch = applyStopSequences(text, stopSequences);
+  const toolCalls = message.toolCalls ?? message.tool_calls ?? [];
+  const content = [] as Array<
+    | { type: "text"; text: string }
+    | {
+        type: "tool_use";
+        id: string;
+        name: string;
+        input: Record<string, unknown>;
+      }
+  >;
+
+  if (stopMatch.text.length > 0) {
+    content.push({
+      type: "text",
+      text: stopMatch.text,
+    });
+  }
+
+  for (const toolCall of toolCalls) {
+    content.push({
+      type: "tool_use",
+      id: toolCall.id,
+      name: toolCall.function.name,
+      input: parseToolUseInput(toolCall.function.arguments),
+    });
+  }
+
+  return {
+    content,
+    stopSequence: stopMatch.stopSequence,
+    responseText: JSON.stringify(content),
+  };
+}
+
 function encodeAnthropicEvent(event: string, data: unknown) {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 }
@@ -123,13 +219,34 @@ function createAnthropicStreamResponse(input: {
   const decoder = new TextDecoder();
   let buffered = "";
   let messageStarted = false;
-  let contentBlockStarted = false;
+  let activeContentBlock:
+    | { index: number; type: "text" }
+    | {
+        index: number;
+        type: "tool_use";
+        toolCallIndex: number;
+        id: string;
+        name: string;
+        inputBuffer: string;
+      }
+    | null = null;
+  let nextContentBlockIndex = 0;
   let messageStopped = false;
   let responseModel = input.fallbackModel;
-  let responseId = crypto.randomUUID();
+  let responseId: string = crypto.randomUUID();
   let stopReason: string | null = null;
   let matchedStopSequence: string | null = null;
   let emittedText = "";
+  const streamToolUses = new Map<
+    number,
+    {
+      contentIndex: number;
+      id: string;
+      name: string;
+      inputBuffer: string;
+      started: boolean;
+    }
+  >();
   const usage = estimateAnthropicUsage({
     requestBody: input.requestBody,
     responseText: "",
@@ -166,23 +283,133 @@ function createAnthropicStreamResponse(input: {
     messageStarted = true;
   };
 
-  const startContentBlock = (
+  const startTextBlock = (
     controller: ReadableStreamDefaultController<Uint8Array>,
   ) => {
     startMessage(controller);
-    if (contentBlockStarted) {
-      return;
+    if (activeContentBlock?.type === "text") {
+      return activeContentBlock.index;
     }
+    closeActiveContentBlock(controller);
 
+    const index = nextContentBlockIndex++;
     emit(controller, "content_block_start", {
       type: "content_block_start",
-      index: 0,
+      index,
       content_block: {
         type: "text",
         text: "",
       },
     });
-    contentBlockStarted = true;
+    activeContentBlock = { index, type: "text" };
+    return index;
+  };
+
+  const closeActiveContentBlock = (
+    controller: ReadableStreamDefaultController<Uint8Array>,
+  ) => {
+    if (!activeContentBlock) {
+      return;
+    }
+
+    emit(controller, "content_block_stop", {
+      type: "content_block_stop",
+      index: activeContentBlock.index,
+    });
+    activeContentBlock = null;
+  };
+
+  const upsertToolUseBlock = (
+    controller: ReadableStreamDefaultController<Uint8Array>,
+    toolCall: {
+      index?: number;
+      id?: string;
+      function?: { name?: string; arguments?: string };
+    },
+  ) => {
+    startMessage(controller);
+
+    const toolCallIndex = toolCall.index ?? 0;
+    const existing = streamToolUses.get(toolCallIndex);
+    const id = toolCall.id ?? existing?.id;
+    const name = toolCall.function?.name ?? existing?.name;
+    const nextInputChunk = toolCall.function?.arguments ?? "";
+
+    if (!id || !name) {
+      return;
+    }
+
+    if (
+      activeContentBlock &&
+      !(
+        activeContentBlock.type === "tool_use" &&
+        activeContentBlock.toolCallIndex === toolCallIndex
+      )
+    ) {
+      closeActiveContentBlock(controller);
+    }
+
+    const toolUse = existing ?? {
+      contentIndex: nextContentBlockIndex++,
+      id,
+      name,
+      inputBuffer: "",
+      started: false,
+    };
+
+    toolUse.id = id;
+    toolUse.name = name;
+
+    if (!toolUse.started) {
+      emit(controller, "content_block_start", {
+        type: "content_block_start",
+        index: toolUse.contentIndex,
+        content_block: {
+          type: "tool_use",
+          id: toolUse.id,
+          name: toolUse.name,
+          input: {},
+        },
+      });
+      toolUse.started = true;
+    }
+
+    activeContentBlock = {
+      index: toolUse.contentIndex,
+      type: "tool_use",
+      toolCallIndex,
+      id: toolUse.id,
+      name: toolUse.name,
+      inputBuffer: toolUse.inputBuffer,
+    };
+
+    if (nextInputChunk.length > 0) {
+      emit(controller, "content_block_delta", {
+        type: "content_block_delta",
+        index: toolUse.contentIndex,
+        delta: {
+          type: "input_json_delta",
+          partial_json: nextInputChunk,
+        },
+      });
+      toolUse.inputBuffer += nextInputChunk;
+      activeContentBlock.inputBuffer = toolUse.inputBuffer;
+    }
+
+    streamToolUses.set(toolCallIndex, toolUse);
+
+    usage.output_tokens = Math.max(
+      1,
+      Math.ceil(
+        new TextEncoder().encode(
+          JSON.stringify({
+            id: toolUse.id,
+            name: toolUse.name,
+            input: parseToolUseInput(toolUse.inputBuffer),
+          }),
+        ).byteLength / 4,
+      ),
+    );
   };
 
   const stopMessage = (
@@ -192,12 +419,7 @@ function createAnthropicStreamResponse(input: {
       return;
     }
 
-    if (contentBlockStarted) {
-      emit(controller, "content_block_stop", {
-        type: "content_block_stop",
-        index: 0,
-      });
-    }
+    closeActiveContentBlock(controller);
 
     emit(controller, "message_delta", {
       type: "message_delta",
@@ -242,7 +464,16 @@ function createAnthropicStreamResponse(input: {
       id?: string;
       model?: string;
       choices?: Array<{
-        delta?: { content?: string; role?: string };
+        delta?: {
+          content?: string;
+          role?: string;
+          tool_calls?: Array<{
+            index?: number;
+            id?: string;
+            type?: "function";
+            function?: { name?: string; arguments?: string };
+          }>;
+        };
         finish_reason?: string | null;
       }>;
     };
@@ -271,10 +502,10 @@ function createAnthropicStreamResponse(input: {
       );
 
       if (textDelta.length > 0) {
-        startContentBlock(controller);
+        const index = startTextBlock(controller);
         emit(controller, "content_block_delta", {
           type: "content_block_delta",
-          index: 0,
+          index,
           delta: {
             type: "text_delta",
             text: textDelta,
@@ -290,8 +521,16 @@ function createAnthropicStreamResponse(input: {
       }
     }
 
+    const toolCalls = choice?.delta?.tool_calls ?? [];
+    for (const toolCall of toolCalls) {
+      upsertToolUseBlock(controller, toolCall);
+    }
+
     if (choice?.finish_reason) {
-      stopReason = mapFinishReasonToStopReason(choice.finish_reason);
+      stopReason =
+        streamToolUses.size > 0 && choice.finish_reason === "stop"
+          ? "tool_use"
+          : mapFinishReasonToStopReason(choice.finish_reason);
       stopMessage(controller);
     }
   };
@@ -428,15 +667,20 @@ anthropicMessagesRouter.post("/v1/messages", async (c) => {
         );
       }
 
-      const text = parsedResponse.data.choices
-        .map((choice) => choice.message.content)
-        .filter((value) => value.length > 0)
-        .join("\n");
-      const stopMatch = applyStopSequences(text, parsed.data.stop_sequences);
+      const firstChoice = parsedResponse.data.choices[0];
+      const translatedContent = toAnthropicResponseContent(
+        firstChoice?.message ?? { role: "assistant", content: "" },
+        parsed.data.stop_sequences,
+      );
       const usage = estimateAnthropicUsage({
         requestBody: rawBody,
-        responseText: stopMatch.text,
+        responseText: translatedContent.responseText,
       });
+      const finishReason =
+        firstChoice?.finishReason ?? firstChoice?.finish_reason ?? null;
+      const hasToolUse = translatedContent.content.some(
+        (block) => block.type === "tool_use",
+      );
 
       return new Response(
         JSON.stringify({
@@ -444,13 +688,13 @@ anthropicMessagesRouter.post("/v1/messages", async (c) => {
           type: "message",
           role: "assistant",
           model: parsedResponse.data.model,
-          content: [{ type: "text", text: stopMatch.text }],
-          stop_reason: stopMatch.stopSequence
+          content: translatedContent.content,
+          stop_reason: translatedContent.stopSequence
             ? "stop_sequence"
-            : (mapFinishReasonToStopReason(
-                parsedResponse.data.choices[0]?.finishReason,
-              ) ?? "end_turn"),
-          stop_sequence: stopMatch.stopSequence,
+            : hasToolUse
+              ? "tool_use"
+              : (mapFinishReasonToStopReason(finishReason) ?? "end_turn"),
+          stop_sequence: translatedContent.stopSequence,
           usage,
         }),
         {

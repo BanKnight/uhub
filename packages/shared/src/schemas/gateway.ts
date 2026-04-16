@@ -24,10 +24,24 @@ export const chatCompletionsRequestSchema = z.object({
 
 export const anthropicMessageRoleSchema = z.enum(["user", "assistant"]);
 
-export const anthropicMessageContentBlockSchema = z.object({
+export const anthropicTextBlockInputSchema = z.object({
   type: z.literal("text"),
   text: z.string().min(1),
 });
+
+export const anthropicToolResultBlockSchema = z.object({
+  type: z.literal("tool_result"),
+  tool_use_id: z.string().min(1),
+  content: z.union([
+    z.string().min(1),
+    z.array(anthropicTextBlockInputSchema).min(1),
+  ]),
+});
+
+export const anthropicMessageContentBlockSchema = z.union([
+  anthropicTextBlockInputSchema,
+  anthropicToolResultBlockSchema,
+]);
 
 export const anthropicMessageSchema = z.object({
   role: anthropicMessageRoleSchema,
@@ -41,7 +55,9 @@ export const anthropicMessagesRequestSchema = z.object({
   model: z.string().min(1),
   messages: z.array(anthropicMessageSchema).min(1),
   max_tokens: z.number().int().positive(),
-  system: z.string().min(1).optional(),
+  system: z
+    .union([z.string().min(1), z.array(anthropicTextBlockInputSchema).min(1)])
+    .optional(),
   temperature: z.number().min(0).max(1).optional(),
   top_p: z.number().min(0).max(1).optional(),
   top_k: z.number().int().positive().optional(),
@@ -92,13 +108,25 @@ export const requestHistoryItemSchema = z.object({
   createdAt: z.number().int(),
 });
 
+export const chatCompletionToolCallSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal("function"),
+  function: z.object({
+    name: z.string().min(1),
+    arguments: z.string(),
+  }),
+});
+
 export const chatCompletionChoiceSchema = z.object({
   index: z.number().int(),
   message: z.object({
     role: z.literal("assistant"),
-    content: z.string(),
+    content: z.string().nullable().optional(),
+    toolCalls: z.array(chatCompletionToolCallSchema).optional(),
+    tool_calls: z.array(chatCompletionToolCallSchema).optional(),
   }),
-  finishReason: z.string().nullable(),
+  finishReason: z.string().nullable().optional(),
+  finish_reason: z.string().nullable().optional(),
 });
 
 export const chatCompletionsResponseSchema = z.object({
@@ -114,6 +142,18 @@ export const anthropicTextBlockSchema = z.object({
   text: z.string(),
 });
 
+export const anthropicToolUseBlockSchema = z.object({
+  type: z.literal("tool_use"),
+  id: z.string().min(1),
+  name: z.string().min(1),
+  input: z.record(z.string(), z.unknown()),
+});
+
+export const anthropicResponseContentBlockSchema = z.union([
+  anthropicTextBlockSchema,
+  anthropicToolUseBlockSchema,
+]);
+
 export const anthropicUsageSchema = z.object({
   input_tokens: z.number().int().nonnegative(),
   output_tokens: z.number().int().nonnegative(),
@@ -124,7 +164,7 @@ export const anthropicMessagesResponseSchema = z.object({
   type: z.literal("message"),
   role: z.literal("assistant"),
   model: z.string(),
-  content: z.array(anthropicTextBlockSchema),
+  content: z.array(anthropicResponseContentBlockSchema),
   stop_reason: z.string().nullable(),
   stop_sequence: z.string().nullable(),
   usage: anthropicUsageSchema,

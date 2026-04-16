@@ -444,6 +444,47 @@
         "stream 响应中的 `message_start`/`message_delta` 带有 `usage`，并在命中 stop sequence 时返回正确的 `stop_reason` 与 `stop_sequence`",
         "对应动态验证结果被记录到 progress.txt"
       ]
-    }
-  ]
-}
+    },
+    {
+      "id": "V2-M3-US3",
+      "title": "补齐 Anthropic messages 的 block 输入兼容",
+      "priority": 38,
+      "passes": true,
+      "acceptanceCriteria": [
+        "`system` 支持 text blocks 数组输入，并可被规整到当前最小转发链路",
+        "`messages[].content` 支持 `tool_result` block，并可被规整为可转发文本而不报 schema 错误",
+        "对应动态验证结果被记录到 progress.txt"
+      ]
+    },
+    {
+      "id": "V2-M3-US4",
+      "title": "补齐 Anthropic messages 的 non-stream tool_use 输出",
+      "priority": 39,
+      "passes": true,
+      "acceptanceCriteria": [
+        "当上游 OpenAI chat completion 返回 `tool_calls` 时，`/anthropic/v1/messages` 的 non-stream 响应会翻译为 Claude `tool_use` content block",
+        "tool call 的 `function.arguments` 会被尽量解析为结构化 `input` 对象，无法解析时至少保底为可消费对象",
+        "存在 `tool_use` block 时，响应会返回 `stop_reason=tool_use`，且对应动态验证结果被记录到 progress.txt"
+      ]
+    },
+    {
+      "id": "V2-M3-US5",
+      "title": "补齐 Anthropic messages 的 stream tool_use 输出",
+      "priority": 40,
+      "passes": true,
+      "acceptanceCriteria": [
+        "当上游 OpenAI streaming chunk 返回 `tool_calls` 增量时，`/anthropic/v1/messages` 会输出 Claude 风格 `tool_use` block 事件序列",
+        "最小事件序列至少包含 `content_block_start(type=tool_use)`、`content_block_delta(type=input_json_delta)`、`content_block_stop`、`message_delta(stop_reason=tool_use)`、`message_stop`",
+        "对应动态验证结果被记录到 progress.txt"
+      ]
+    },
+    {
+      "id": "V2-M3-US6",
+      "title": "补齐 Anthropic messages 的 stream tool_call 分片兼容",
+      "priority": 41,
+      "passes": true,
+      "acceptanceCriteria": [
+        "当上游将同一个 `tool_call` 的 `function.arguments` 拆成多个 streaming chunk 时，`/anthropic/v1/messages` 仍会聚合到同一个 Claude `tool_use` block index",
+        "分片场景下会连续输出多个 `content_block_delta(type=input_json_delta)`，并保持单个 `content_block_start`/`content_block_stop` 配对",
+        "对应动态验证结果被记录到 progress.txt"
+      ]
