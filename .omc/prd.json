@@ -384,6 +384,42 @@
         "timeout 场景返回稳定错误结构，且对应 requests/audit 可辨认失败类型",
         "验证结果被记录到 progress.txt"
       ]
+    },
+    {
+      "id": "V2-M2-US1",
+      "title": "增加 Claude-compatible messages 最小入口",
+      "priority": 33,
+      "passes": true,
+      "acceptanceCriteria": [
+        "apps/api-worker 提供 `/anthropic/v1/messages` 最小入口，并复用现有 gateway key auth、channel 选择、并发 lease 与 request log 骨架",
+        "Claude messages 请求可被转换为上游 `/v1/chat/completions` 请求，成功响应可被转换回最小 Claude message 响应结构",
+        "当前范围只要求最小 non-stream messages 流程，不提前实现完整 Anthropic streaming 事件协议",
+        "admin 侧可为 API key 选择 `anthropic_messages` endpoint rule"
+      ]
+    },
+    {
+      "id": "V2-M2-US2",
+      "title": "验证 Claude-compatible messages 最小链路",
+      "priority": 34,
+      "passes": true,
+      "acceptanceCriteria": [
+        "apps/api-worker、packages/shared、apps/admin-web 的 typecheck/build 通过",
+        "admin 可创建允许 `anthropic_messages` 的 API key",
+        "携带允许的 raw key 调用 `/anthropic/v1/messages` 返回 200 与最小 Claude message 响应结构",
+        "audit 可读到 `endpoint=anthropic_messages`、traceId、status=completed、httpStatus=200，且验证结果被记录到 progress.txt"
+      ]
+    },
+    {
+      "id": "V2-M2-US3",
+      "title": "补齐 Claude-compatible messages 的最小 streaming 翻译",
+      "priority": 35,
+      "passes": true,
+      "acceptanceCriteria": [
+        "`/anthropic/v1/messages` 在 `stream=true` 时返回 `text/event-stream`，并把上游 OpenAI-style SSE 翻译成最小 Anthropic Messages 事件序列",
+        "最小事件序列至少包含 `message_start`、`content_block_start`、`content_block_delta`、`content_block_stop`、`message_delta`、`message_stop`",
+        "文本增量可通过 `content_block_delta.delta.type=text_delta` 正常输出，结束原因会映射到 Claude 风格 `stop_reason`",
+        "request log / audit 继续记录 `endpoint=anthropic_messages`、traceId、status 与 httpStatus"
+      ]
     }
   ]
 }

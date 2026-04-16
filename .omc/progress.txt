@@ -185,7 +185,7 @@
 - admin tRPC 若要依赖 cookie session，前端 tRPC link 必须显式带 `credentials: 'include'`，后端 `/trpc/*` 也必须返回带 credentials 的 CORS
 
 ## Current status
-- v2 Milestone 1 已完成：OpenAI `/v1/chat/completions` 热路径现支持真正 SSE 透传、统一 gateway 错误结构与 timeout/network/upstream failure class 记录
-- 最新验证已通过：`bun run typecheck`、`bun run build`、non-stream 200、stream 200 + `text/event-stream` + `[DONE]`、timeout 504 + `upstream_timeout`，且 audit 可读到对应 failureClass
-- 本地动态验证使用 `http://127.0.0.1:8788` worker 与 `http://127.0.0.1:5001` mock upstream 完成
-- 待做：独立 reviewer pass、deslop、回归复验，然后决定是否进入 v2 Milestone 2（Claude-compatible 最小入口）
+- v2 Milestone 2 已完成：Claude-compatible `/anthropic/v1/messages` 现已同时支持最小 non-stream 与 streaming 入口，并复用现有 gateway key auth、channel 选择、并发 lease 与 request log 骨架
+- 最新验证已通过：`apps/api-worker`、`packages/shared`、`apps/admin-web` 的 TypeScript 静态检查通过；并在 `http://127.0.0.1:8790` worker + `http://127.0.0.1:5004` streaming mock upstream 上完成 Claude stream 动态验证
+- 动态验证结果：`trace-v2-m2-anthropic-stream-final` 返回 `200 text/event-stream`，事件序列为 `message_start -> content_block_start -> content_block_delta -> content_block_delta -> content_block_stop -> message_delta -> message_stop`，文本增量为 `Hello` / ` world`，`stopReason=end_turn`，audit 记录显示 `endpoint=anthropic_messages`、`status=completed`、`httpStatus=200`
+- 待做：如要继续 v2，下一个自然阶段是补更完整 Anthropic 协议细节（usage / richer event coverage），或进入 health-aware routing / retry / failover

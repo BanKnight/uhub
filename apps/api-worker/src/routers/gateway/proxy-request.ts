@@ -29,6 +29,11 @@ type ProxyGatewayRequestInput = {
     upstreamResponse: Response;
     traceId: string;
   }) => Response | Promise<Response>;
+  onStream?: (input: {
+    body: ReadableStream<Uint8Array>;
+    upstreamResponse: Response;
+    traceId: string;
+  }) => Response | Promise<Response>;
 };
 
 export async function proxyGatewayRequest(input: ProxyGatewayRequestInput) {
@@ -169,6 +174,14 @@ export async function proxyGatewayRequest(input: ProxyGatewayRequestInput) {
           }
         })(),
       );
+
+      if (input.onStream) {
+        return input.onStream({
+          body: clientBody,
+          upstreamResponse,
+          traceId,
+        });
+      }
 
       return new Response(clientBody, {
         status: upstreamResponse.status,
