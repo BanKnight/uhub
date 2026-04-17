@@ -111,6 +111,58 @@ function toOpenAiMessages(
   return [{ role: 'system', content: normalizedSystem }, ...normalizedMessages];
 }
 
+function toOpenAiTools(
+  tools:
+    | Array<{
+        name: string;
+        description?: string;
+        input_schema: Record<string, unknown>;
+      }>
+    | undefined
+) {
+  if (!tools || tools.length === 0) {
+    return undefined;
+  }
+
+  return tools.map((tool) => ({
+    type: 'function' as const,
+    function: {
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.input_schema,
+    },
+  }));
+}
+
+function toOpenAiToolChoice(
+  toolChoice:
+    | {
+        type: 'auto' | 'any';
+        disable_parallel_tool_use?: boolean;
+      }
+    | {
+        type: 'tool';
+        name: string;
+        disable_parallel_tool_use?: boolean;
+      }
+    | undefined
+) {
+  if (!toolChoice) {
+    return undefined;
+  }
+
+  if (toolChoice.type === 'tool') {
+    return {
+      type: 'function' as const,
+      function: {
+        name: toolChoice.name,
+      },
+    };
+  }
+
+  return toolChoice.type === 'any' ? 'required' : 'auto';
+}
+
 function mapFinishReasonToStopReason(finishReason: string | null | undefined) {
   if (finishReason === 'stop') {
     return 'end_turn';
@@ -651,6 +703,8 @@ anthropicMessagesRouter.post('/v1/messages', async (c) => {
     temperature: parsed.data.temperature,
     top_p: parsed.data.top_p,
     stop: parsed.data.stop_sequences,
+    tools: toOpenAiTools(parsed.data.tools),
+    tool_choice: toOpenAiToolChoice(parsed.data.tool_choice),
     stream: parsed.data.stream === true,
   });
 

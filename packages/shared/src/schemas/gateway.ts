@@ -10,9 +10,30 @@ export const chatMessageSchema = z.object({
   content: z.string().min(1),
 });
 
+export const chatCompletionToolDefinitionSchema = z.object({
+  type: z.literal('function'),
+  function: z.object({
+    name: z.string().min(1),
+    description: z.string().min(1).optional(),
+    parameters: z.record(z.string(), z.unknown()).optional(),
+  }),
+});
+
+export const chatCompletionToolChoiceSchema = z.union([
+  z.enum(['none', 'auto', 'required']),
+  z.object({
+    type: z.literal('function'),
+    function: z.object({
+      name: z.string().min(1),
+    }),
+  }),
+]);
+
 export const chatCompletionsRequestSchema = z.object({
   model: z.string().min(1),
   messages: z.array(chatMessageSchema).min(1),
+  tools: z.array(chatCompletionToolDefinitionSchema).min(1).optional(),
+  tool_choice: chatCompletionToolChoiceSchema.optional(),
   temperature: z.number().min(0).max(2).optional(),
   stream: z.boolean().optional(),
 });
@@ -47,6 +68,29 @@ export const anthropicDocumentBlockInputSchema = z.object({
     }),
   ]),
 });
+
+export const anthropicToolSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().min(1).optional(),
+  input_schema: z.record(z.string(), z.unknown()),
+});
+
+const anthropicToolChoiceBaseSchema = z.object({
+  disable_parallel_tool_use: z.boolean().optional(),
+});
+
+export const anthropicToolChoiceSchema = z.union([
+  anthropicToolChoiceBaseSchema.extend({
+    type: z.literal('auto'),
+  }),
+  anthropicToolChoiceBaseSchema.extend({
+    type: z.literal('any'),
+  }),
+  anthropicToolChoiceBaseSchema.extend({
+    type: z.literal('tool'),
+    name: z.string().min(1),
+  }),
+]);
 
 export const anthropicToolUseBlockInputSchema = z.object({
   type: z.literal('tool_use'),
@@ -90,6 +134,8 @@ export const anthropicMessagesRequestSchema = z.object({
   top_k: z.number().int().positive().optional(),
   stop_sequences: z.array(z.string().min(1)).max(4).optional(),
   metadata: z.record(z.string(), z.string()).optional(),
+  tools: z.array(anthropicToolSchema).min(1).optional(),
+  tool_choice: anthropicToolChoiceSchema.optional(),
   stream: z.boolean().optional(),
 });
 

@@ -26,7 +26,8 @@
     "test:integration:anthropic:tool-use-stream": "bun tests/integration/anthropic-tool-use-stream.ts",
     "test:integration:anthropic:tool-use-nonstream": "bun tests/integration/anthropic-tool-use-nonstream.ts",
     "test:integration:anthropic:invalid-request": "bun tests/integration/anthropic-invalid-request.ts",
-    "test:integration:anthropic:gateway-failover": "bun tests/integration/anthropic-gateway-failover.ts"
+    "test:integration:anthropic:gateway-failover": "bun tests/integration/anthropic-gateway-failover.ts",
+    "test:integration:anthropic:tools-request": "bun tests/integration/anthropic-tools-request.ts"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx,json}": [
