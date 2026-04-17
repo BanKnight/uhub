@@ -89,6 +89,7 @@ export const apiKeyChannelRules = sqliteTable(
   {
     apiKeyId: text("api_key_id").notNull(),
     channelId: text("channel_id").notNull(),
+    position: integer("position").notNull(),
   },
   (table) => [primaryKey({ columns: [table.apiKeyId, table.channelId] })],
 );

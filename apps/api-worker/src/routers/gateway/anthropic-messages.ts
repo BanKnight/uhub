@@ -16,10 +16,35 @@ const ANTHROPIC_MESSAGES_ENDPOINT = "anthropic_messages";
 
 export const anthropicMessagesRouter = new Hono<{ Bindings: WorkerEnv }>();
 
-function normalizeAnthropicTextBlocks(
-  blocks: Array<{ type: "text"; text: string }>,
+function normalizeAnthropicInputBlocks(
+  blocks: Array<
+    | { type: "text"; text: string }
+    | { type: "image"; source: { media_type: string } }
+    | {
+        type: "document";
+        source:
+          | { type: "base64"; media_type: string }
+          | { type: "text"; text: string };
+      }
+  >,
 ) {
-  return blocks.map((block) => block.text).join("\n");
+  return blocks
+    .map((block) => {
+      if (block.type === "text") {
+        return block.text;
+      }
+
+      if (block.type === "image") {
+        return `[image:${block.source.media_type}]`;
+      }
+
+      if (block.source.type === "text") {
+        return `[document:text] ${block.source.text}`;
+      }
+
+      return `[document:${block.source.media_type}]`;
+    })
+    .join("\n");
 }
 
 function normalizeAnthropicContent(content: AnthropicMessage["content"]) {
@@ -33,10 +58,24 @@ function normalizeAnthropicContent(content: AnthropicMessage["content"]) {
         return block.text;
       }
 
+      if (block.type === "image") {
+        return `[image:${block.source.media_type}]`;
+      }
+
+      if (block.type === "document") {
+        return block.source.type === "text"
+          ? `[document:text] ${block.source.text}`
+          : `[document:${block.source.media_type}]`;
+      }
+
+      if (block.type === "tool_use") {
+        return `[tool_use:${block.id}:${block.name}] ${JSON.stringify(block.input)}`;
+      }
+
       const toolResultContent =
         typeof block.content === "string"
           ? block.content
-          : normalizeAnthropicTextBlocks(block.content);
+          : normalizeAnthropicInputBlocks(block.content);
       return `[tool_result:${block.tool_use_id}] ${toolResultContent}`;
     })
     .join("\n");
@@ -53,7 +92,7 @@ function normalizeAnthropicSystem(
     return system;
   }
 
-  return normalizeAnthropicTextBlocks(system);
+  return normalizeAnthropicInputBlocks(system);
 }
 
 function toOpenAiMessages(
@@ -332,68 +371,27 @@ function createAnthropicStreamResponse(input: {
     const toolCallIndex = toolCall.index ?? 0;
     const existing = streamToolUses.get(toolCallIndex);
     const id = toolCall.id ?? existing?.id;
-    const name = toolCall.function?.name ?? existing?.name;
+    const nextNameChunk = toolCall.function?.name ?? "";
     const nextInputChunk = toolCall.function?.arguments ?? "";
 
-    if (!id || !name) {
+    if (!id) {
       return;
-    }
-
-    if (
-      activeContentBlock &&
-      !(
-        activeContentBlock.type === "tool_use" &&
-        activeContentBlock.toolCallIndex === toolCallIndex
-      )
-    ) {
-      closeActiveContentBlock(controller);
     }
 
     const toolUse = existing ?? {
       contentIndex: nextContentBlockIndex++,
       id,
-      name,
+      name: "",
       inputBuffer: "",
       started: false,
     };
 
     toolUse.id = id;
-    toolUse.name = name;
-
-    if (!toolUse.started) {
-      emit(controller, "content_block_start", {
-        type: "content_block_start",
-        index: toolUse.contentIndex,
-        content_block: {
-          type: "tool_use",
-          id: toolUse.id,
-          name: toolUse.name,
-          input: {},
-        },
-      });
-      toolUse.started = true;
+    if (nextNameChunk.length > 0) {
+      toolUse.name += nextNameChunk;
     }
-
-    activeContentBlock = {
-      index: toolUse.contentIndex,
-      type: "tool_use",
-      toolCallIndex,
-      id: toolUse.id,
-      name: toolUse.name,
-      inputBuffer: toolUse.inputBuffer,
-    };
-
     if (nextInputChunk.length > 0) {
-      emit(controller, "content_block_delta", {
-        type: "content_block_delta",
-        index: toolUse.contentIndex,
-        delta: {
-          type: "input_json_delta",
-          partial_json: nextInputChunk,
-        },
-      });
       toolUse.inputBuffer += nextInputChunk;
-      activeContentBlock.inputBuffer = toolUse.inputBuffer;
     }
 
     streamToolUses.set(toolCallIndex, toolUse);
@@ -527,6 +525,56 @@ function createAnthropicStreamResponse(input: {
     }
 
     if (choice?.finish_reason) {
+      for (const [toolCallIndex, toolUse] of streamToolUses) {
+        if (!toolUse.id || !toolUse.name) {
+          continue;
+        }
+
+        if (
+          activeContentBlock &&
+          !(
+            activeContentBlock.type === "tool_use" &&
+            activeContentBlock.toolCallIndex === toolCallIndex
+          )
+        ) {
+          closeActiveContentBlock(controller);
+        }
+
+        if (!toolUse.started) {
+          emit(controller, "content_block_start", {
+            type: "content_block_start",
+            index: toolUse.contentIndex,
+            content_block: {
+              type: "tool_use",
+              id: toolUse.id,
+              name: toolUse.name,
+              input: {},
+            },
+          });
+          toolUse.started = true;
+        }
+
+        activeContentBlock = {
+          index: toolUse.contentIndex,
+          type: "tool_use",
+          toolCallIndex,
+          id: toolUse.id,
+          name: toolUse.name,
+          inputBuffer: toolUse.inputBuffer,
+        };
+
+        if (toolUse.inputBuffer.length > 0) {
+          emit(controller, "content_block_delta", {
+            type: "content_block_delta",
+            index: toolUse.contentIndex,
+            delta: {
+              type: "input_json_delta",
+              partial_json: toolUse.inputBuffer,
+            },
+          });
+        }
+      }
+
       stopReason =
         streamToolUses.size > 0 && choice.finish_reason === "stop"
           ? "tool_use"

@@ -20,7 +20,12 @@
     "check": "bun run format:check && bun run lint && bun run typecheck && bun run build",
     "prepare": "husky",
     "db:generate": "bun --cwd apps/api-worker drizzle-kit generate",
-    "db:migrate:local": "bun x wrangler d1 migrations apply DB --local --cwd apps/api-worker"
+    "db:migrate:local": "bun x wrangler d1 migrations apply DB --local --cwd apps/api-worker",
+    "test:integration:anthropic:nonstream": "bun tests/integration/anthropic-nonstream.ts",
+    "test:integration:anthropic:stream-text": "bun tests/integration/anthropic-stream-text.ts",
+    "test:integration:anthropic:tool-use-nonstream": "bun tests/integration/anthropic-tool-use-nonstream.ts",
+    "test:integration:anthropic:invalid-request": "bun tests/integration/anthropic-invalid-request.ts",
+    "test:integration:anthropic:gateway-failover": "bun tests/integration/anthropic-gateway-failover.ts"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx,json}": [

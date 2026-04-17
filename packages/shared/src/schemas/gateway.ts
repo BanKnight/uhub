@@ -29,17 +29,57 @@ export const anthropicTextBlockInputSchema = z.object({
   text: z.string().min(1),
 });
 
+export const anthropicImageBlockInputSchema = z.object({
+  type: z.literal("image"),
+  source: z.object({
+    type: z.literal("base64"),
+    media_type: z.string().min(1),
+    data: z.string().min(1),
+  }),
+});
+
+export const anthropicDocumentBlockInputSchema = z.object({
+  type: z.literal("document"),
+  source: z.union([
+    z.object({
+      type: z.literal("base64"),
+      media_type: z.string().min(1),
+      data: z.string().min(1),
+    }),
+    z.object({
+      type: z.literal("text"),
+      text: z.string().min(1),
+    }),
+  ]),
+});
+
+export const anthropicToolUseBlockInputSchema = z.object({
+  type: z.literal("tool_use"),
+  id: z.string().min(1),
+  name: z.string().min(1),
+  input: z.record(z.string(), z.unknown()),
+});
+
+export const anthropicToolResultContentBlockSchema = z.union([
+  anthropicTextBlockInputSchema,
+  anthropicImageBlockInputSchema,
+  anthropicDocumentBlockInputSchema,
+]);
+
 export const anthropicToolResultBlockSchema = z.object({
   type: z.literal("tool_result"),
   tool_use_id: z.string().min(1),
   content: z.union([
     z.string().min(1),
-    z.array(anthropicTextBlockInputSchema).min(1),
+    z.array(anthropicToolResultContentBlockSchema).min(1),
   ]),
 });
 
 export const anthropicMessageContentBlockSchema = z.union([
   anthropicTextBlockInputSchema,
+  anthropicImageBlockInputSchema,
+  anthropicDocumentBlockInputSchema,
+  anthropicToolUseBlockInputSchema,
   anthropicToolResultBlockSchema,
 ]);
 
