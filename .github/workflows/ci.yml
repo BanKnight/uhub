@@ -74,6 +74,7 @@ jobs:
 
           bun run test:integration:anthropic:nonstream 2>&1 | tee artifacts/anthropic-nonstream.log
           bun run test:integration:anthropic:stream-text 2>&1 | tee artifacts/anthropic-stream-text.log
+          bun run test:integration:anthropic:tool-use-stream 2>&1 | tee artifacts/anthropic-tool-use-stream.log
           bun run test:integration:anthropic:tool-use-nonstream 2>&1 | tee artifacts/anthropic-tool-use-nonstream.log
           bun run test:integration:anthropic:invalid-request 2>&1 | tee artifacts/anthropic-invalid-request.log
           bun run test:integration:anthropic:gateway-failover 2>&1 | tee artifacts/anthropic-gateway-failover.log

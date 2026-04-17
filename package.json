@@ -23,6 +23,7 @@
     "db:migrate:local": "bun x wrangler d1 migrations apply DB --local --cwd apps/api-worker",
     "test:integration:anthropic:nonstream": "bun tests/integration/anthropic-nonstream.ts",
     "test:integration:anthropic:stream-text": "bun tests/integration/anthropic-stream-text.ts",
+    "test:integration:anthropic:tool-use-stream": "bun tests/integration/anthropic-tool-use-stream.ts",
     "test:integration:anthropic:tool-use-nonstream": "bun tests/integration/anthropic-tool-use-nonstream.ts",
     "test:integration:anthropic:invalid-request": "bun tests/integration/anthropic-invalid-request.ts",
     "test:integration:anthropic:gateway-failover": "bun tests/integration/anthropic-gateway-failover.ts"
