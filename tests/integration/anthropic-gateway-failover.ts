@@ -6,19 +6,19 @@ import {
   createChannel,
   ensureAdminSession,
   withMockJsonUpstream,
-} from "./_anthropic";
+} from './_anthropic';
 
 async function callAnthropic(rawKey: string) {
   const response = await fetch(`${WORKER_BASE_URL}/anthropic/v1/messages`, {
-    method: "POST",
+    method: 'POST',
     headers: {
-      "content-type": "application/json",
+      'content-type': 'application/json',
       authorization: `Bearer ${rawKey}`,
     },
     body: JSON.stringify({
-      model: "claude-3-5-sonnet-latest",
+      model: 'claude-3-5-sonnet-latest',
       max_tokens: 128,
-      messages: [{ role: "user", content: "Say hello with failover" }],
+      messages: [{ role: 'user', content: 'Say hello with failover' }],
     }),
   });
 
@@ -40,11 +40,11 @@ async function main() {
         status: 503,
         body: JSON.stringify({
           error: {
-            message: "primary unavailable",
+            message: 'primary unavailable',
           },
         }),
         headers: {
-          "content-type": "application/json",
+          'content-type': 'application/json',
         },
       };
     },
@@ -55,23 +55,23 @@ async function main() {
           const parsed = JSON.parse(body);
           return {
             body: JSON.stringify({
-              id: "chatcmpl-anthropic-failover-test",
-              object: "chat.completion",
+              id: 'chatcmpl-anthropic-failover-test',
+              object: 'chat.completion',
               created: 1710000003,
-              model: parsed.model ?? "gpt-4o-mini",
+              model: parsed.model ?? 'gpt-4o-mini',
               choices: [
                 {
                   index: 0,
                   message: {
-                    role: "assistant",
-                    content: "served-by-secondary",
+                    role: 'assistant',
+                    content: 'served-by-secondary',
                   },
-                  finish_reason: "stop",
+                  finish_reason: 'stop',
                 },
               ],
             }),
             headers: {
-              "content-type": "application/json",
+              'content-type': 'application/json',
             },
           };
         },
@@ -88,44 +88,40 @@ async function main() {
           const rawKey = await createApiKey(cookie, {
             label: `anthropic-failover-key-${Date.now()}`,
             channelIds: [primaryChannelId, secondaryChannelId],
-            endpointRules: ["anthropic_messages"],
+            endpointRules: ['anthropic_messages'],
           });
           const { response, json } = await callAnthropic(rawKey);
 
           assert(response.ok, `Failover request failed: ${JSON.stringify(json)}`);
           assert(
-            response.headers.get("content-type")?.includes("application/json"),
-            `Unexpected content-type: ${response.headers.get("content-type")}`,
+            response.headers.get('content-type')?.includes('application/json'),
+            `Unexpected content-type: ${response.headers.get('content-type')}`
           );
-          assert(response.headers.get("x-trace-id"), "Missing x-trace-id header");
-          assert(json?.type === "message", `Unexpected response type: ${JSON.stringify(json)}`);
+          assert(response.headers.get('x-trace-id'), 'Missing x-trace-id header');
+          assert(json?.type === 'message', `Unexpected response type: ${JSON.stringify(json)}`);
           assert(
-            json?.content?.[0]?.type === "text" &&
-              json.content[0].text === "served-by-secondary",
-            `Unexpected failover response body: ${JSON.stringify(json)}`,
+            json?.content?.[0]?.type === 'text' && json.content[0].text === 'served-by-secondary',
+            `Unexpected failover response body: ${JSON.stringify(json)}`
           );
           assert(primaryHits === 1, `Expected primaryHits=1, got ${primaryHits}`);
-          assert(
-            secondaryHits === 1,
-            `Expected secondaryHits=1, got ${secondaryHits}`,
-          );
+          assert(secondaryHits === 1, `Expected secondaryHits=1, got ${secondaryHits}`);
 
           console.log(
             JSON.stringify(
               {
-                status: "ok",
-                traceId: response.headers.get("x-trace-id"),
+                status: 'ok',
+                traceId: response.headers.get('x-trace-id'),
                 primaryHits,
                 secondaryHits,
                 text: json.content[0].text,
               },
               null,
-              2,
-            ),
+              2
+            )
           );
-        },
+        }
       );
-    },
+    }
   );
 }
 

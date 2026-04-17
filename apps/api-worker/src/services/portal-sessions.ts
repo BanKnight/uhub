@@ -21,7 +21,10 @@ function readPortalSessionId(request: Request) {
   return match?.[1] ?? null;
 }
 
-export async function createPortalSession(env: WorkerEnv, apiKeyId: string): Promise<PortalSessionRecord | null> {
+export async function createPortalSession(
+  env: WorkerEnv,
+  apiKeyId: string
+): Promise<PortalSessionRecord | null> {
   const db = getDb(env);
   const now = Date.now();
   const id = crypto.randomUUID();
@@ -52,7 +55,10 @@ export async function createPortalSession(env: WorkerEnv, apiKeyId: string): Pro
   };
 }
 
-export async function getPortalSession(env: WorkerEnv, request: Request): Promise<PortalSessionRecord | null> {
+export async function getPortalSession(
+  env: WorkerEnv,
+  request: Request
+): Promise<PortalSessionRecord | null> {
   const sessionId = readPortalSessionId(request);
 
   if (!sessionId) {
@@ -84,7 +90,10 @@ export async function getPortalSession(env: WorkerEnv, request: Request): Promis
   };
 }
 
-export async function getPortalSessionApiKey(env: WorkerEnv, request: Request): Promise<ApiKey | null> {
+export async function getPortalSessionApiKey(
+  env: WorkerEnv,
+  request: Request
+): Promise<ApiKey | null> {
   const session = await getPortalSession(env, request);
 
   if (!session) {

@@ -102,13 +102,17 @@ function App() {
           <section>
             <h2>Portal overview</h2>
             <p>
-              Logged in as {session.label}. Session expires at {new Date(session.expiresAt).toISOString()}.
+              Logged in as {session.label}. Session expires at{' '}
+              {new Date(session.expiresAt).toISOString()}.
             </p>
             {isLoadingPortal ? <p>Loading portal data...</p> : null}
             {overview ? (
               <ul>
                 <li>Status: {overview.status}</li>
-                <li>Expires at: {overview.expiresAt ? new Date(overview.expiresAt).toISOString() : 'never'}</li>
+                <li>
+                  Expires at:{' '}
+                  {overview.expiresAt ? new Date(overview.expiresAt).toISOString() : 'never'}
+                </li>
                 <li>Max concurrency: {overview.maxConcurrency}</li>
                 <li>Allowed endpoints: {overview.endpointRules.join(', ')}</li>
               </ul>

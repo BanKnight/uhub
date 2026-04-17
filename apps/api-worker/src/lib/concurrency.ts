@@ -25,7 +25,11 @@ function getConcurrencyStub(env: WorkerEnv, apiKeyId: string) {
   return env.API_KEY_CONCURRENCY.get(id);
 }
 
-export async function acquireConcurrencyLease(env: WorkerEnv, apiKeyId: string, maxConcurrency: number) {
+export async function acquireConcurrencyLease(
+  env: WorkerEnv,
+  apiKeyId: string,
+  maxConcurrency: number
+) {
   const response = await getConcurrencyStub(env, apiKeyId).fetch('https://do.internal/acquire', {
     method: 'POST',
     body: JSON.stringify({

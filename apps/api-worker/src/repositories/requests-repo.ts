@@ -5,10 +5,10 @@ import type {
   GatewayFailureClass,
   GatewayRequestStatus,
   RequestHistoryItem,
-} from "@uhub/shared";
-import { and, desc, eq, like } from "drizzle-orm";
-import { apiKeys, channels, getDb, requests } from "../db/schema";
-import type { WorkerEnv } from "../index";
+} from '@uhub/shared';
+import { and, desc, eq, like } from 'drizzle-orm';
+import { apiKeys, channels, getDb, requests } from '../db/schema';
+import type { WorkerEnv } from '../index';
 
 type CreateRequestRecordInput = {
   apiKeyId: string;
@@ -29,10 +29,7 @@ type FinishRequestRecordInput = {
   responseSize: number | null;
 };
 
-export async function createRequestRecord(
-  env: WorkerEnv,
-  input: CreateRequestRecordInput,
-) {
+export async function createRequestRecord(env: WorkerEnv, input: CreateRequestRecordInput) {
   const db = getDb(env);
   const now = Date.now();
   const id = crypto.randomUUID();
@@ -44,7 +41,7 @@ export async function createRequestRecord(
     model: input.model,
     channelId: input.channelId,
     traceId: input.traceId,
-    status: "pending",
+    status: 'pending',
     failureClass: null,
     httpStatus: null,
     latencyMs: null,
@@ -61,7 +58,7 @@ export async function createRequestRecord(
 
 export async function listRequestsByApiKey(
   env: WorkerEnv,
-  apiKeyId: string,
+  apiKeyId: string
 ): Promise<RequestHistoryItem[]> {
   const db = getDb(env);
   const rows = await db
@@ -91,18 +88,14 @@ export async function listRequestsByApiKey(
 
 export async function listRecentRequestsForAdmin(
   env: WorkerEnv,
-  input: AuditListInput = {},
+  input: AuditListInput = {}
 ): Promise<AuditRequestItem[]> {
   const db = getDb(env);
   const filters = [
     input.endpoint ? eq(requests.endpoint, input.endpoint) : undefined,
     input.status ? eq(requests.status, input.status) : undefined,
-    input.failureClass
-      ? eq(requests.failureClass, input.failureClass)
-      : undefined,
-    input.apiKeyPrefix
-      ? like(apiKeys.keyPrefix, `${input.apiKeyPrefix}%`)
-      : undefined,
+    input.failureClass ? eq(requests.failureClass, input.failureClass) : undefined,
+    input.apiKeyPrefix ? like(apiKeys.keyPrefix, `${input.apiKeyPrefix}%`) : undefined,
     input.traceId ? like(requests.traceId, `%${input.traceId}%`) : undefined,
   ].filter((value): value is NonNullable<typeof value> => value !== undefined);
   const rows = await db
@@ -147,10 +140,7 @@ export async function listRecentRequestsForAdmin(
   }));
 }
 
-export async function finishRequestRecord(
-  env: WorkerEnv,
-  input: FinishRequestRecordInput,
-) {
+export async function finishRequestRecord(env: WorkerEnv, input: FinishRequestRecordInput) {
   const db = getDb(env);
   const finishedAt = Date.now();
 

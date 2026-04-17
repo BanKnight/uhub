@@ -4,7 +4,7 @@ import {
   useMutation,
   useQuery,
   useQueryClient,
-} from "@tanstack/react-query";
+} from '@tanstack/react-query';
 import {
   Outlet,
   RouterProvider,
@@ -13,7 +13,7 @@ import {
   createRouter,
   redirect,
   useNavigate,
-} from "@tanstack/react-router";
+} from '@tanstack/react-router';
 import type {
   AnalyticsSummary,
   ApiKey,
@@ -22,8 +22,8 @@ import type {
   CreateApiKeyInput,
   CreateChannelInput,
   UpdateChannelStatusInput,
-} from "@uhub/shared";
-import React from "react";
+} from '@uhub/shared';
+import React from 'react';
 import {
   createApiKey as createApiKeyRequest,
   createChannel as createChannelRequest,
@@ -34,33 +34,33 @@ import {
   revokeApiKey as revokeApiKeyRequest,
   rotateApiKey as rotateApiKeyRequest,
   updateChannelStatus,
-} from "./lib/api";
-import { adminAuthClient, getAdminSession } from "./lib/auth";
+} from './lib/api';
+import { adminAuthClient, getAdminSession } from './lib/auth';
 
 const queryClient = new QueryClient();
-const channelsQueryKey = ["admin", "channels"];
-const apiKeysQueryKey = ["admin", "apiKeys"];
-const analyticsQueryKey = ["admin", "analytics"];
-const auditQueryKey = ["admin", "audit"];
-const sessionQueryKey = ["admin", "session"];
+const channelsQueryKey = ['admin', 'channels'];
+const apiKeysQueryKey = ['admin', 'apiKeys'];
+const analyticsQueryKey = ['admin', 'analytics'];
+const auditQueryKey = ['admin', 'audit'];
+const sessionQueryKey = ['admin', 'session'];
 const initialChannelForm: CreateChannelInput = {
-  name: "",
-  provider: "",
-  baseUrl: "https://example.com",
-  status: "active",
-  configJson: "{}",
+  name: '',
+  provider: '',
+  baseUrl: 'https://example.com',
+  status: 'active',
+  configJson: '{}',
 };
 const initialApiKeyForm: CreateApiKeyInput = {
-  label: "",
+  label: '',
   channelIds: [],
-  endpointRules: ["openai_chat_completions"],
+  endpointRules: ['openai_chat_completions'],
   maxConcurrency: 1,
   expiresAt: null,
 };
 
-const endpointOptions: CreateApiKeyInput["endpointRules"] = [
-  "openai_chat_completions",
-  "anthropic_messages",
+const endpointOptions: CreateApiKeyInput['endpointRules'] = [
+  'openai_chat_completions',
+  'anthropic_messages',
 ];
 
 function parseExpiresAtInput(value: string) {
@@ -84,8 +84,8 @@ function RootLayout() {
 function SignInPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [email, setEmail] = React.useState("");
-  const [password, setPassword] = React.useState("");
+  const [email, setEmail] = React.useState('');
+  const [password, setPassword] = React.useState('');
   const [error, setError] = React.useState<string | null>(null);
 
   const signInMutation = useMutation({
@@ -106,14 +106,10 @@ function SignInPage() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: sessionQueryKey });
-      navigate({ to: "/" });
+      navigate({ to: '/' });
     },
     onError: (mutationError) => {
-      setError(
-        mutationError instanceof Error
-          ? mutationError.message
-          : "Sign in failed.",
-      );
+      setError(mutationError instanceof Error ? mutationError.message : 'Sign in failed.');
     },
   });
 
@@ -146,7 +142,7 @@ function SignInPage() {
           />
         </div>
         <button type="submit" disabled={signInMutation.isPending}>
-          {signInMutation.isPending ? "Signing in..." : "Sign in"}
+          {signInMutation.isPending ? 'Signing in...' : 'Sign in'}
         </button>
       </form>
       {error ? <p>{error}</p> : null}
@@ -164,19 +160,15 @@ function AnalyticsSection({ analytics }: { analytics: AnalyticsSummary }) {
         <li>Completed: {analytics.completedRequests}</li>
         <li>Failed: {analytics.failedRequests}</li>
         <li>Rejected: {analytics.rejectedRequests}</li>
-        <li>Avg latency: {analytics.avgLatencyMs ?? "n/a"}</li>
+        <li>Avg latency: {analytics.avgLatencyMs ?? 'n/a'}</li>
         <li>
-          Success rate:{" "}
-          {analytics.successRate === null
-            ? "n/a"
-            : `${(analytics.successRate * 100).toFixed(1)}%`}
+          Success rate:{' '}
+          {analytics.successRate === null ? 'n/a' : `${(analytics.successRate * 100).toFixed(1)}%`}
         </li>
       </ul>
 
       <h3>By endpoint</h3>
-      {analytics.endpointBreakdown.length === 0 ? (
-        <p>No request analytics yet.</p>
-      ) : null}
+      {analytics.endpointBreakdown.length === 0 ? <p>No request analytics yet.</p> : null}
       <ul>
         {analytics.endpointBreakdown.map((item) => (
           <li key={item.endpoint}>
@@ -185,21 +177,17 @@ function AnalyticsSection({ analytics }: { analytics: AnalyticsSummary }) {
             <div>Completed: {item.completedRequests}</div>
             <div>Failed: {item.failedRequests}</div>
             <div>Rejected: {item.rejectedRequests}</div>
-            <div>Avg latency: {item.avgLatencyMs ?? "n/a"}</div>
+            <div>Avg latency: {item.avgLatencyMs ?? 'n/a'}</div>
             <div>
-              Success rate:{" "}
-              {item.successRate === null
-                ? "n/a"
-                : `${(item.successRate * 100).toFixed(1)}%`}
+              Success rate:{' '}
+              {item.successRate === null ? 'n/a' : `${(item.successRate * 100).toFixed(1)}%`}
             </div>
           </li>
         ))}
       </ul>
 
       <h3>By channel</h3>
-      {analytics.channelBreakdown.length === 0 ? (
-        <p>No channel analytics yet.</p>
-      ) : null}
+      {analytics.channelBreakdown.length === 0 ? <p>No channel analytics yet.</p> : null}
       <ul>
         {analytics.channelBreakdown.map((item) => (
           <li key={item.channelId}>
@@ -209,12 +197,10 @@ function AnalyticsSection({ analytics }: { analytics: AnalyticsSummary }) {
             <div>Completed: {item.completedRequests}</div>
             <div>Failed: {item.failedRequests}</div>
             <div>Rejected: {item.rejectedRequests}</div>
-            <div>Avg latency: {item.avgLatencyMs ?? "n/a"}</div>
+            <div>Avg latency: {item.avgLatencyMs ?? 'n/a'}</div>
             <div>
-              Success rate:{" "}
-              {item.successRate === null
-                ? "n/a"
-                : `${(item.successRate * 100).toFixed(1)}%`}
+              Success rate:{' '}
+              {item.successRate === null ? 'n/a' : `${(item.successRate * 100).toFixed(1)}%`}
             </div>
           </li>
         ))}
@@ -280,9 +266,7 @@ function AuditSection({
           }
         >
           <option value="">All</option>
-          <option value="openai_chat_completions">
-            openai_chat_completions
-          </option>
+          <option value="openai_chat_completions">openai_chat_completions</option>
           <option value="anthropic_messages">anthropic_messages</option>
         </select>
       </div>
@@ -318,13 +302,13 @@ function AuditSection({
         {items.map((item) => (
           <li key={item.id}>
             <strong>{item.apiKeyLabel ?? item.apiKeyId}</strong>
-            <div>Prefix: {item.apiKeyPrefix ?? "n/a"}</div>
+            <div>Prefix: {item.apiKeyPrefix ?? 'n/a'}</div>
             <div>Endpoint: {item.endpoint}</div>
-            <div>Channel: {item.channelName ?? item.channelId ?? "n/a"}</div>
+            <div>Channel: {item.channelName ?? item.channelId ?? 'n/a'}</div>
             <div>Status: {item.status}</div>
-            <div>HTTP: {item.httpStatus ?? "n/a"}</div>
-            <div>Latency: {item.latencyMs ?? "n/a"}</div>
-            <div>Trace: {item.traceId ?? "n/a"}</div>
+            <div>HTTP: {item.httpStatus ?? 'n/a'}</div>
+            <div>Latency: {item.latencyMs ?? 'n/a'}</div>
+            <div>Trace: {item.traceId ?? 'n/a'}</div>
             <div>Created: {new Date(item.createdAt).toISOString()}</div>
           </li>
         ))}
@@ -336,17 +320,15 @@ function AuditSection({
 function ChannelsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [form, setForm] =
-    React.useState<CreateChannelInput>(initialChannelForm);
-  const [apiKeyForm, setApiKeyForm] =
-    React.useState<CreateApiKeyInput>(initialApiKeyForm);
-  const [expiresAtInput, setExpiresAtInput] = React.useState("");
+  const [form, setForm] = React.useState<CreateChannelInput>(initialChannelForm);
+  const [apiKeyForm, setApiKeyForm] = React.useState<CreateApiKeyInput>(initialApiKeyForm);
+  const [expiresAtInput, setExpiresAtInput] = React.useState('');
   const [createdRawKey, setCreatedRawKey] = React.useState<string | null>(null);
   const [auditFilters, setAuditFilters] = React.useState({
-    status: "",
-    endpoint: "",
-    apiKeyPrefix: "",
-    traceId: "",
+    status: '',
+    endpoint: '',
+    apiKeyPrefix: '',
+    traceId: '',
   });
 
   const sessionQuery = useQuery({
@@ -370,17 +352,10 @@ function ChannelsPage() {
     queryFn: () =>
       listAuditRequests({
         status: auditFilters.status
-          ? (auditFilters.status as
-              | "pending"
-              | "processing"
-              | "completed"
-              | "failed"
-              | "rejected")
+          ? (auditFilters.status as 'pending' | 'processing' | 'completed' | 'failed' | 'rejected')
           : undefined,
         endpoint: auditFilters.endpoint
-          ? (auditFilters.endpoint as
-              | "openai_chat_completions"
-              | "anthropic_messages")
+          ? (auditFilters.endpoint as 'openai_chat_completions' | 'anthropic_messages')
           : undefined,
         apiKeyPrefix: auditFilters.apiKeyPrefix || undefined,
         traceId: auditFilters.traceId || undefined,
@@ -391,7 +366,7 @@ function ChannelsPage() {
     mutationFn: async () => adminAuthClient.signOut(),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: sessionQueryKey });
-      navigate({ to: "/sign-in" });
+      navigate({ to: '/sign-in' });
     },
   });
 
@@ -416,7 +391,7 @@ function ChannelsPage() {
     onSuccess: async (result) => {
       setCreatedRawKey(result.rawKey);
       setApiKeyForm({ ...initialApiKeyForm });
-      setExpiresAtInput("");
+      setExpiresAtInput('');
       await queryClient.invalidateQueries({ queryKey: apiKeysQueryKey });
     },
   });
@@ -439,36 +414,28 @@ function ChannelsPage() {
   });
 
   const channels = channelsQuery.data ?? [];
-  const activeChannels = channels.filter(
-    (channel) => channel.status === "active",
-  );
+  const activeChannels = channels.filter((channel) => channel.status === 'active');
   const apiKeys = apiKeysQuery.data ?? [];
 
   return (
     <section>
       <h2>Channels</h2>
-      <p>Signed in as {sessionQuery.data?.user.email ?? "unknown"}.</p>
+      <p>Signed in as {sessionQuery.data?.user.email ?? 'unknown'}.</p>
       <button
         type="button"
         disabled={signOutMutation.isPending}
         onClick={() => signOutMutation.mutate()}
       >
-        {signOutMutation.isPending ? "Signing out..." : "Sign out"}
+        {signOutMutation.isPending ? 'Signing out...' : 'Sign out'}
       </button>
       <p>Milestone 2 minimal channel management shell.</p>
 
-      {analyticsQuery.data ? (
-        <AnalyticsSection analytics={analyticsQuery.data} />
-      ) : null}
+      {analyticsQuery.data ? <AnalyticsSection analytics={analyticsQuery.data} /> : null}
       {analyticsQuery.isPending ? <p>Loading dashboard...</p> : null}
       {analyticsQuery.error ? <p>Failed to load dashboard.</p> : null}
 
       {auditQuery.data ? (
-        <AuditSection
-          items={auditQuery.data}
-          filters={auditFilters}
-          setFilters={setAuditFilters}
-        />
+        <AuditSection items={auditQuery.data} filters={auditFilters} setFilters={setAuditFilters} />
       ) : null}
       {auditQuery.isPending ? <p>Loading audit...</p> : null}
       {auditQuery.error ? <p>Failed to load audit.</p> : null}
@@ -484,9 +451,7 @@ function ChannelsPage() {
           <input
             id="channel-name"
             value={form.name}
-            onChange={(event) =>
-              setForm((current) => ({ ...current, name: event.target.value }))
-            }
+            onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
           />
         </div>
         <div>
@@ -523,7 +488,7 @@ function ChannelsPage() {
             onChange={(event) =>
               setForm((current) => ({
                 ...current,
-                status: event.target.value as CreateChannelInput["status"],
+                status: event.target.value as CreateChannelInput['status'],
               }))
             }
           >
@@ -545,24 +510,19 @@ function ChannelsPage() {
           />
         </div>
         <button type="submit" disabled={createChannelMutation.isPending}>
-          {createChannelMutation.isPending ? "Creating..." : "Create channel"}
+          {createChannelMutation.isPending ? 'Creating...' : 'Create channel'}
         </button>
       </form>
 
       {channelsQuery.isPending ? <p>Loading channels...</p> : null}
       {channelsQuery.error ? <p>Failed to load channels.</p> : null}
       {createChannelMutation.error ? <p>Failed to create channel.</p> : null}
-      {updateStatusMutation.error ? (
-        <p>Failed to update channel status.</p>
-      ) : null}
-      {!channelsQuery.isPending && channels.length === 0 ? (
-        <p>No channels yet.</p>
-      ) : null}
+      {updateStatusMutation.error ? <p>Failed to update channel status.</p> : null}
+      {!channelsQuery.isPending && channels.length === 0 ? <p>No channels yet.</p> : null}
 
       <ul>
         {channels.map((channel: Channel) => {
-          const nextStatus =
-            channel.status === "active" ? "disabled" : "active";
+          const nextStatus = channel.status === 'active' ? 'disabled' : 'active';
           return (
             <li key={channel.id}>
               <strong>{channel.name}</strong>
@@ -615,7 +575,7 @@ function ChannelsPage() {
             <label htmlFor="api-key-channel">Allowed channel</label>
             <select
               id="api-key-channel"
-              value={apiKeyForm.channelIds[0] ?? ""}
+              value={apiKeyForm.channelIds[0] ?? ''}
               onChange={(event) =>
                 setApiKeyForm((current) => ({
                   ...current,
@@ -635,14 +595,11 @@ function ChannelsPage() {
             <label htmlFor="api-key-endpoint">Allowed endpoint</label>
             <select
               id="api-key-endpoint"
-              value={apiKeyForm.endpointRules[0] ?? "openai_chat_completions"}
+              value={apiKeyForm.endpointRules[0] ?? 'openai_chat_completions'}
               onChange={(event) =>
                 setApiKeyForm((current) => ({
                   ...current,
-                  endpointRules: [
-                    event.target
-                      .value as CreateApiKeyInput["endpointRules"][number],
-                  ],
+                  endpointRules: [event.target.value as CreateApiKeyInput['endpointRules'][number]],
                 }))
               }
             >
@@ -679,12 +636,9 @@ function ChannelsPage() {
           </div>
           <button
             type="submit"
-            disabled={
-              createApiKeyMutation.isPending ||
-              apiKeyForm.channelIds.length === 0
-            }
+            disabled={createApiKeyMutation.isPending || apiKeyForm.channelIds.length === 0}
           >
-            {createApiKeyMutation.isPending ? "Issuing..." : "Issue key"}
+            {createApiKeyMutation.isPending ? 'Issuing...' : 'Issue key'}
           </button>
         </form>
         {createApiKeyMutation.error ? <p>Failed to issue API key.</p> : null}
@@ -704,31 +658,24 @@ function ChannelsPage() {
               <div>Prefix: {apiKey.keyPrefix}</div>
               <div>Status: {apiKey.status}</div>
               <div>Max concurrency: {apiKey.maxConcurrency}</div>
-              <div>Endpoints: {apiKey.endpointRules.join(", ")}</div>
-              <div>Channels: {apiKey.channelIds.join(", ")}</div>
+              <div>Endpoints: {apiKey.endpointRules.join(', ')}</div>
+              <div>Channels: {apiKey.channelIds.join(', ')}</div>
               <div>
-                Expires at:{" "}
-                {apiKey.expiresAt
-                  ? new Date(apiKey.expiresAt).toISOString()
-                  : "never"}
+                Expires at: {apiKey.expiresAt ? new Date(apiKey.expiresAt).toISOString() : 'never'}
               </div>
               <button
                 type="button"
-                disabled={
-                  revokeApiKeyMutation.isPending || apiKey.status === "revoked"
-                }
+                disabled={revokeApiKeyMutation.isPending || apiKey.status === 'revoked'}
                 onClick={() => revokeApiKeyMutation.mutate(apiKey.id)}
               >
-                {apiKey.status === "revoked" ? "Revoked" : "Revoke key"}
+                {apiKey.status === 'revoked' ? 'Revoked' : 'Revoke key'}
               </button>
               <button
                 type="button"
-                disabled={
-                  rotateApiKeyMutation.isPending || apiKey.status === "revoked"
-                }
+                disabled={rotateApiKeyMutation.isPending || apiKey.status === 'revoked'}
                 onClick={() => rotateApiKeyMutation.mutate(apiKey.id)}
               >
-                {rotateApiKeyMutation.isPending ? "Rotating..." : "Rotate key"}
+                {rotateApiKeyMutation.isPending ? 'Rotating...' : 'Rotate key'}
               </button>
             </li>
           ))}
@@ -741,16 +688,16 @@ function ChannelsPage() {
 const rootRoute = createRootRoute({ component: RootLayout });
 const signInRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/sign-in",
+  path: '/sign-in',
   component: SignInPage,
 });
 const channelsRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/",
+  path: '/',
   beforeLoad: async () => {
     const session = await getAdminSession();
     if (!session) {
-      throw redirect({ to: "/sign-in" });
+      throw redirect({ to: '/sign-in' });
     }
   },
   component: ChannelsPage,
@@ -759,7 +706,7 @@ const channelsRoute = createRoute({
 const routeTree = rootRoute.addChildren([signInRoute, channelsRoute]);
 const router = createRouter({ routeTree });
 
-declare module "@tanstack/react-router" {
+declare module '@tanstack/react-router' {
   interface Register {
     router: typeof router;
   }

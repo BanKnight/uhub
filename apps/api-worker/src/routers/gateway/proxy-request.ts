@@ -1,28 +1,25 @@
-import type { GatewayEndpoint, GatewayFailureClass } from "@uhub/shared";
-import type { WorkerEnv } from "../../index";
-import {
-  acquireConcurrencyLease,
-  releaseConcurrencyLease,
-} from "../../lib/concurrency";
-import { requireApiKey } from "../../middleware/require-api-key";
+import type { GatewayEndpoint, GatewayFailureClass } from '@uhub/shared';
+import type { WorkerEnv } from '../../index';
+import { acquireConcurrencyLease, releaseConcurrencyLease } from '../../lib/concurrency';
+import { requireApiKey } from '../../middleware/require-api-key';
 import {
   type GatewayChannel,
   listActiveGatewayChannels,
   markGatewayChannelHealthy,
   markGatewayChannelUnhealthy,
   prioritizeGatewayChannels,
-} from "../../services/gateway/channels";
+} from '../../services/gateway/channels';
 import {
   finishRequestLog,
   getTraceId,
   startRequestLog,
-} from "../../services/request-log/request-log";
+} from '../../services/request-log/request-log';
 import {
   createGatewayAbortSignal,
   createGatewayErrorResponse,
   isAbortError,
   readGatewayErrorMessage,
-} from "./error-response";
+} from './error-response';
 
 type ProxyGatewayRequestInput = {
   c: { env: WorkerEnv; req: { raw: Request }; executionCtx: ExecutionContext };
@@ -55,25 +52,22 @@ function isRetriableUpstreamStatus(status: number) {
   return status >= 500;
 }
 
-function shouldContinueToNextChannel(
-  failure: AttemptFailure,
-  hasMoreChannels: boolean,
-) {
+function shouldContinueToNextChannel(failure: AttemptFailure, hasMoreChannels: boolean) {
   if (!hasMoreChannels) {
     return false;
   }
 
-  if (failure.failureClass === "network_error") {
+  if (failure.failureClass === 'network_error') {
     return true;
   }
 
-  if (failure.failureClass === "upstream_timeout") {
+  if (failure.failureClass === 'upstream_timeout') {
     return true;
   }
 
   return (
-    failure.failureClass === "upstream_error" &&
-    typeof failure.upstreamStatus === "number" &&
+    failure.failureClass === 'upstream_error' &&
+    typeof failure.upstreamStatus === 'number' &&
     isRetriableUpstreamStatus(failure.upstreamStatus)
   );
 }
@@ -86,22 +80,15 @@ export async function proxyGatewayRequest(input: ProxyGatewayRequestInput) {
   let releaseHandledByStream = false;
 
   try {
-    const auth = await requireApiKey(
-      input.c.env,
-      input.c.req.raw,
-      input.endpoint,
-    );
-    const activeChannels = await listActiveGatewayChannels(
-      input.c.env,
-      auth.channelIds,
-    );
+    const auth = await requireApiKey(input.c.env, input.c.req.raw, input.endpoint);
+    const activeChannels = await listActiveGatewayChannels(input.c.env, auth.channelIds);
 
     if (activeChannels.length === 0) {
       return createGatewayErrorResponse(
-        "auth_error",
-        "Allowed channels are not active",
+        'auth_error',
+        'Allowed channels are not active',
         traceId,
-        403,
+        403
       );
     }
 
@@ -110,16 +97,16 @@ export async function proxyGatewayRequest(input: ProxyGatewayRequestInput) {
     concurrencyLease = await acquireConcurrencyLease(
       input.c.env,
       auth.apiKey.id,
-      auth.apiKey.maxConcurrency,
+      auth.apiKey.maxConcurrency
     );
     leaseApiKeyId = auth.apiKey.id;
 
     if (!concurrencyLease) {
       return createGatewayErrorResponse(
-        "auth_error",
-        "API key concurrency limit exceeded",
+        'auth_error',
+        'API key concurrency limit exceeded',
         traceId,
-        429,
+        429
       );
     }
 
@@ -137,30 +124,26 @@ export async function proxyGatewayRequest(input: ProxyGatewayRequestInput) {
     for (const [index, channel] of prioritizedChannels.entries()) {
       try {
         const upstreamResponse = await fetch(
-          `${channel.baseUrl.replace(/\/$/, "")}/v1/chat/completions`,
+          `${channel.baseUrl.replace(/\/$/, '')}/v1/chat/completions`,
           {
-            method: "POST",
+            method: 'POST',
             headers: {
-              "content-type": "application/json",
-              "x-trace-id": traceId,
+              'content-type': 'application/json',
+              'x-trace-id': traceId,
             },
             body: input.rawBody,
             signal: createGatewayAbortSignal(),
-          },
+          }
         );
 
-        const contentType =
-          upstreamResponse.headers.get("content-type") ?? "application/json";
+        const contentType = upstreamResponse.headers.get('content-type') ?? 'application/json';
 
         if (!upstreamResponse.ok) {
           const responseBody = await upstreamResponse.text();
-          const message = readGatewayErrorMessage(
-            responseBody,
-            "Upstream request failed",
-          );
+          const message = readGatewayErrorMessage(responseBody, 'Upstream request failed');
           const failure: AttemptFailure = {
             channel,
-            failureClass: "upstream_error",
+            failureClass: 'upstream_error',
             message,
             status: upstreamResponse.status,
             upstreamStatus: upstreamResponse.status,
@@ -172,19 +155,14 @@ export async function proxyGatewayRequest(input: ProxyGatewayRequestInput) {
           }
 
           lastFailure = failure;
-          if (
-            shouldContinueToNextChannel(
-              failure,
-              index < prioritizedChannels.length - 1,
-            )
-          ) {
+          if (shouldContinueToNextChannel(failure, index < prioritizedChannels.length - 1)) {
             continue;
           }
 
           await finishRequestLog(input.c.env, {
             id: requestLog.id,
             startedAt: requestLog.startedAt,
-            status: "failed",
+            status: 'failed',
             failureClass: failure.failureClass,
             channelId: channel.id,
             httpStatus: failure.status,
@@ -196,14 +174,13 @@ export async function proxyGatewayRequest(input: ProxyGatewayRequestInput) {
             failure.message,
             traceId,
             failure.status,
-            failure.upstreamStatus,
+            failure.upstreamStatus
           );
         }
 
         markGatewayChannelHealthy(channel.id);
 
-        const isStream =
-          input.allowStream && contentType.includes("text/event-stream");
+        const isStream = input.allowStream && contentType.includes('text/event-stream');
 
         if (isStream && upstreamResponse.body) {
           let streamedBytes = 0;
@@ -228,7 +205,7 @@ export async function proxyGatewayRequest(input: ProxyGatewayRequestInput) {
                 await finishRequestLog(input.c.env, {
                   id: requestLogSnapshot.id,
                   startedAt: requestLogSnapshot.startedAt,
-                  status: "completed",
+                  status: 'completed',
                   failureClass: null,
                   channelId: channel.id,
                   httpStatus: upstreamResponse.status,
@@ -240,10 +217,8 @@ export async function proxyGatewayRequest(input: ProxyGatewayRequestInput) {
                 await finishRequestLog(input.c.env, {
                   id: requestLogSnapshot.id,
                   startedAt: requestLogSnapshot.startedAt,
-                  status: "failed",
-                  failureClass: isAbortError(error)
-                    ? "upstream_timeout"
-                    : "network_error",
+                  status: 'failed',
+                  failureClass: isAbortError(error) ? 'upstream_timeout' : 'network_error',
                   channelId: channel.id,
                   httpStatus: upstreamResponse.status,
                   responseBody: null,
@@ -254,11 +229,11 @@ export async function proxyGatewayRequest(input: ProxyGatewayRequestInput) {
                   await releaseConcurrencyLease(
                     input.c.env,
                     leaseApiKeyIdSnapshot,
-                    leaseSnapshot.leaseId,
+                    leaseSnapshot.leaseId
                   );
                 }
               }
-            })(),
+            })()
           );
 
           if (input.onStream) {
@@ -272,12 +247,10 @@ export async function proxyGatewayRequest(input: ProxyGatewayRequestInput) {
           return new Response(clientBody, {
             status: upstreamResponse.status,
             headers: {
-              "content-type": contentType,
-              "cache-control":
-                upstreamResponse.headers.get("cache-control") ?? "no-cache",
-              connection:
-                upstreamResponse.headers.get("connection") ?? "keep-alive",
-              "x-trace-id": traceId,
+              'content-type': contentType,
+              'cache-control': upstreamResponse.headers.get('cache-control') ?? 'no-cache',
+              connection: upstreamResponse.headers.get('connection') ?? 'keep-alive',
+              'x-trace-id': traceId,
             },
           });
         }
@@ -287,7 +260,7 @@ export async function proxyGatewayRequest(input: ProxyGatewayRequestInput) {
         await finishRequestLog(input.c.env, {
           id: requestLog.id,
           startedAt: requestLog.startedAt,
-          status: "completed",
+          status: 'completed',
           failureClass: null,
           channelId: channel.id,
           httpStatus: upstreamResponse.status,
@@ -301,19 +274,15 @@ export async function proxyGatewayRequest(input: ProxyGatewayRequestInput) {
         return new Response(responseBody, {
           status: upstreamResponse.status,
           headers: {
-            "content-type": contentType,
-            "x-trace-id": traceId,
+            'content-type': contentType,
+            'x-trace-id': traceId,
           },
         });
       } catch (error) {
         const failure: AttemptFailure = {
           channel,
-          failureClass: isAbortError(error)
-            ? "upstream_timeout"
-            : "network_error",
-          message: isAbortError(error)
-            ? "Upstream request timed out"
-            : "Gateway request failed",
+          failureClass: isAbortError(error) ? 'upstream_timeout' : 'network_error',
+          message: isAbortError(error) ? 'Upstream request timed out' : 'Gateway request failed',
           status: isAbortError(error) ? 504 : 502,
           upstreamStatus: null,
           responseBody: null,
@@ -322,19 +291,14 @@ export async function proxyGatewayRequest(input: ProxyGatewayRequestInput) {
         markGatewayChannelUnhealthy(channel.id);
         lastFailure = failure;
 
-        if (
-          shouldContinueToNextChannel(
-            failure,
-            index < prioritizedChannels.length - 1,
-          )
-        ) {
+        if (shouldContinueToNextChannel(failure, index < prioritizedChannels.length - 1)) {
           continue;
         }
 
         await finishRequestLog(input.c.env, {
           id: requestLog.id,
           startedAt: requestLog.startedAt,
-          status: "failed",
+          status: 'failed',
           failureClass: failure.failureClass,
           channelId: channel.id,
           httpStatus: null,
@@ -346,7 +310,7 @@ export async function proxyGatewayRequest(input: ProxyGatewayRequestInput) {
           failure.message,
           traceId,
           failure.status,
-          failure.upstreamStatus,
+          failure.upstreamStatus
         );
       }
     }
@@ -355,7 +319,7 @@ export async function proxyGatewayRequest(input: ProxyGatewayRequestInput) {
       await finishRequestLog(input.c.env, {
         id: requestLog.id,
         startedAt: requestLog.startedAt,
-        status: "failed",
+        status: 'failed',
         failureClass: lastFailure.failureClass,
         channelId: lastFailure.channel.id,
         httpStatus: lastFailure.upstreamStatus,
@@ -367,25 +331,23 @@ export async function proxyGatewayRequest(input: ProxyGatewayRequestInput) {
         lastFailure.message,
         traceId,
         lastFailure.status,
-        lastFailure.upstreamStatus,
+        lastFailure.upstreamStatus
       );
     }
 
     return createGatewayErrorResponse(
-      "auth_error",
-      "Allowed channels are not active",
+      'auth_error',
+      'Allowed channels are not active',
       traceId,
-      403,
+      403
     );
   } catch (error) {
     if (requestLog) {
       await finishRequestLog(input.c.env, {
         id: requestLog.id,
         startedAt: requestLog.startedAt,
-        status: "failed",
-        failureClass: isAbortError(error)
-          ? "upstream_timeout"
-          : "network_error",
+        status: 'failed',
+        failureClass: isAbortError(error) ? 'upstream_timeout' : 'network_error',
         httpStatus: null,
         responseBody: null,
       });
@@ -393,36 +355,27 @@ export async function proxyGatewayRequest(input: ProxyGatewayRequestInput) {
 
     if (error instanceof Response) {
       return createGatewayErrorResponse(
-        "auth_error",
-        "Gateway authorization failed",
+        'auth_error',
+        'Gateway authorization failed',
         traceId,
         error.status,
-        error.status,
+        error.status
       );
     }
 
     if (isAbortError(error)) {
       return createGatewayErrorResponse(
-        "upstream_timeout",
-        "Upstream request timed out",
+        'upstream_timeout',
+        'Upstream request timed out',
         traceId,
-        504,
+        504
       );
     }
 
-    return createGatewayErrorResponse(
-      "network_error",
-      "Gateway request failed",
-      traceId,
-      502,
-    );
+    return createGatewayErrorResponse('network_error', 'Gateway request failed', traceId, 502);
   } finally {
     if (!releaseHandledByStream && concurrencyLease && leaseApiKeyId) {
-      await releaseConcurrencyLease(
-        input.c.env,
-        leaseApiKeyId,
-        concurrencyLease.leaseId,
-      );
+      await releaseConcurrencyLease(input.c.env, leaseApiKeyId, concurrencyLease.leaseId);
     }
   }
 }

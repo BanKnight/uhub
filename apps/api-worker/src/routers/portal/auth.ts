@@ -28,7 +28,10 @@ portalAuthRouter.post('/exchange', async (c) => {
     return c.json({ error: 'Failed to create portal session' }, 500);
   }
 
-  c.header('Set-Cookie', `${PORTAL_COOKIE_NAME}=${session.id}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${PORTAL_COOKIE_MAX_AGE_SECONDS}`);
+  c.header(
+    'Set-Cookie',
+    `${PORTAL_COOKIE_NAME}=${session.id}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${PORTAL_COOKIE_MAX_AGE_SECONDS}`
+  );
 
   const result = portalExchangeResultSchema.parse({
     sessionId: session.id,

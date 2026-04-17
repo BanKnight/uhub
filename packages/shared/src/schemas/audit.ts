@@ -1,9 +1,9 @@
-import { z } from "zod";
+import { z } from 'zod';
 import {
   gatewayEndpointSchema,
   gatewayFailureClassSchema,
   gatewayRequestStatusSchema,
-} from "./gateway";
+} from './gateway';
 
 export const auditRequestItemSchema = z.object({
   id: z.string(),

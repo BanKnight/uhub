@@ -1,15 +1,7 @@
-import { z } from "zod";
+import { z } from 'zod';
 
-export const apiKeyStatusSchema = z.enum([
-  "active",
-  "disabled",
-  "expired",
-  "revoked",
-]);
-export const endpointRuleSchema = z.enum([
-  "openai_chat_completions",
-  "anthropic_messages",
-]);
+export const apiKeyStatusSchema = z.enum(['active', 'disabled', 'expired', 'revoked']);
+export const endpointRuleSchema = z.enum(['openai_chat_completions', 'anthropic_messages']);
 
 export const apiKeySchema = z.object({
   id: z.string(),

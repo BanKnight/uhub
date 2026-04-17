@@ -115,7 +115,10 @@ export async function listApiKeys(env: WorkerEnv): Promise<ApiKey[]> {
   return hydrated.filter((item): item is ApiKey => item !== null);
 }
 
-export async function createApiKey(env: WorkerEnv, input: CreateApiKeyInput): Promise<CreateApiKeyResult> {
+export async function createApiKey(
+  env: WorkerEnv,
+  input: CreateApiKeyInput
+): Promise<CreateApiKeyResult> {
   const db = getDb(env);
   const now = Date.now();
   const id = crypto.randomUUID();
@@ -233,7 +236,10 @@ export async function rotateApiKey(env: WorkerEnv, apiKeyId: string): Promise<Cr
   });
 }
 
-export async function findApiKeyByRawKey(env: WorkerEnv, rawKey: string): Promise<ApiKeyLookup | null> {
+export async function findApiKeyByRawKey(
+  env: WorkerEnv,
+  rawKey: string
+): Promise<ApiKeyLookup | null> {
   const db = getDb(env);
   const keyHash = await sha256(rawKey);
   const row = await db.select().from(apiKeys).where(eq(apiKeys.keyHash, keyHash)).get();
@@ -243,7 +249,8 @@ export async function findApiKeyByRawKey(env: WorkerEnv, rawKey: string): Promis
   }
 
   const now = Date.now();
-  const computedStatus = typeof row.expiresAt === 'number' && row.expiresAt <= now ? 'expired' : row.status;
+  const computedStatus =
+    typeof row.expiresAt === 'number' && row.expiresAt <= now ? 'expired' : row.status;
   const rules = await getRules(env, row.id);
 
   return {

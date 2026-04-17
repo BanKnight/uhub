@@ -68,9 +68,7 @@ export async function ensureAdminAccount(
   const credentialAccount = await db
     .select()
     .from(accounts)
-    .where(
-      and(eq(accounts.userId, user.id), eq(accounts.providerId, 'credential'))
-    )
+    .where(and(eq(accounts.userId, user.id), eq(accounts.providerId, 'credential')))
     .get();
 
   const now = new Date();

@@ -1,13 +1,6 @@
-import type {
-  GatewayEndpoint,
-  GatewayFailureClass,
-  GatewayRequestStatus,
-} from "@uhub/shared";
-import type { WorkerEnv } from "../../index";
-import {
-  createRequestRecord,
-  finishRequestRecord,
-} from "../../repositories/requests-repo";
+import type { GatewayEndpoint, GatewayFailureClass, GatewayRequestStatus } from '@uhub/shared';
+import type { WorkerEnv } from '../../index';
+import { createRequestRecord, finishRequestRecord } from '../../repositories/requests-repo';
 
 export type RequestLogStartInput = {
   apiKeyId: string;
@@ -30,7 +23,7 @@ export type RequestLogFinishInput = {
 };
 
 export function getTraceId(request: Request) {
-  return request.headers.get("x-trace-id") ?? crypto.randomUUID();
+  return request.headers.get('x-trace-id') ?? crypto.randomUUID();
 }
 
 export function getBodySize(value: string | null) {

@@ -1,18 +1,12 @@
 // @ts-nocheck
-import { createServer } from "node:http";
-import type { AddressInfo } from "node:net";
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 
-export const WORKER_BASE_URL =
-  process.env.UHUB_WORKER_BASE_URL ?? "http://127.0.0.1:8797";
-export const ADMIN_EMAIL =
-  process.env.UHUB_ADMIN_EMAIL ?? "admin@example.com";
-export const ADMIN_PASSWORD =
-  process.env.UHUB_ADMIN_PASSWORD ?? "admin123456";
+export const WORKER_BASE_URL = process.env.UHUB_WORKER_BASE_URL ?? 'http://127.0.0.1:8797';
+export const ADMIN_EMAIL = process.env.UHUB_ADMIN_EMAIL ?? 'admin@example.com';
+export const ADMIN_PASSWORD = process.env.UHUB_ADMIN_PASSWORD ?? 'admin123456';
 
-export function assert(
-  condition: unknown,
-  message: string,
-): asserts condition {
+export function assert(condition: unknown, message: string): asserts condition {
   if (!condition) {
     throw new Error(message);
   }
@@ -26,34 +20,30 @@ function mergeCookies(existing: string, setCookies: string[]) {
   const jar = new Map<string, string>();
 
   for (const chunk of existing.split(/;\s*/).filter(Boolean)) {
-    const [name, ...rest] = chunk.split("=");
+    const [name, ...rest] = chunk.split('=');
     if (name && rest.length > 0) {
-      jar.set(name, rest.join("="));
+      jar.set(name, rest.join('='));
     }
   }
 
   for (const cookie of setCookies) {
-    const firstPart = cookie.split(";", 1)[0];
-    const [name, ...rest] = firstPart.split("=");
+    const firstPart = cookie.split(';', 1)[0];
+    const [name, ...rest] = firstPart.split('=');
     if (name && rest.length > 0) {
-      jar.set(name, rest.join("="));
+      jar.set(name, rest.join('='));
     }
   }
 
   return Array.from(jar.entries())
     .map(([name, value]) => `${name}=${value}`)
-    .join("; ");
+    .join('; ');
 }
 
-export async function requestJson(
-  path: string,
-  init: RequestInit = {},
-  cookie = "",
-) {
+export async function requestJson(path: string, init: RequestInit = {}, cookie = '') {
   const headers = new Headers(init.headers);
-  headers.set("content-type", "application/json");
+  headers.set('content-type', 'application/json');
   if (cookie) {
-    headers.set("cookie", cookie);
+    headers.set('cookie', cookie);
   }
 
   const response = await fetch(`${WORKER_BASE_URL}${path}`, {
@@ -72,19 +62,16 @@ export async function requestJson(
 }
 
 export async function ensureAdminSession() {
-  const signIn = await requestJson("/api/auth/sign-in/email", {
-    method: "POST",
+  const signIn = await requestJson('/api/auth/sign-in/email', {
+    method: 'POST',
     body: JSON.stringify({
       email: ADMIN_EMAIL,
       password: ADMIN_PASSWORD,
     }),
   });
 
-  assert(
-    signIn.response.ok,
-    `Admin sign-in failed: ${JSON.stringify(signIn.json)}`,
-  );
-  assert(signIn.cookie, "Admin sign-in did not establish a session cookie");
+  assert(signIn.response.ok, `Admin sign-in failed: ${JSON.stringify(signIn.json)}`);
+  assert(signIn.cookie, 'Admin sign-in did not establish a session cookie');
   return signIn.cookie;
 }
 
@@ -94,30 +81,27 @@ export async function createChannel(
     name: string;
     baseUrl: string;
     provider?: string;
-    status?: "active" | "disabled";
+    status?: 'active' | 'disabled';
     configJson?: string;
-  },
+  }
 ) {
   const result = await requestJson(
-    "/trpc/admin.channels.create",
+    '/trpc/admin.channels.create',
     {
-      method: "POST",
+      method: 'POST',
       body: JSON.stringify({
         name: input.name,
-        provider: input.provider ?? "openai-compatible",
+        provider: input.provider ?? 'openai-compatible',
         baseUrl: input.baseUrl,
-        status: input.status ?? "active",
-        configJson: input.configJson ?? "{}",
+        status: input.status ?? 'active',
+        configJson: input.configJson ?? '{}',
       }),
     },
-    cookie,
+    cookie
   );
 
-  assert(
-    result.response.ok,
-    `Create channel failed: ${JSON.stringify(result.json)}`,
-  );
-  assert(result.json?.result?.data?.id, "Channel response missing id");
+  assert(result.response.ok, `Create channel failed: ${JSON.stringify(result.json)}`);
+  assert(result.json?.result?.data?.id, 'Channel response missing id');
   return result.json.result.data.id as string;
 }
 
@@ -129,12 +113,12 @@ export async function createApiKey(
     endpointRules: string[];
     maxConcurrency?: number;
     expiresAt?: number | null;
-  },
+  }
 ) {
   const result = await requestJson(
-    "/trpc/admin.apiKeys.create",
+    '/trpc/admin.apiKeys.create',
     {
-      method: "POST",
+      method: 'POST',
       body: JSON.stringify({
         label: input.label,
         channelIds: input.channelIds,
@@ -143,14 +127,11 @@ export async function createApiKey(
         expiresAt: input.expiresAt ?? null,
       }),
     },
-    cookie,
+    cookie
   );
 
-  assert(
-    result.response.ok,
-    `Create API key failed: ${JSON.stringify(result.json)}`,
-  );
-  assert(result.json?.result?.data?.rawKey, "API key response missing rawKey");
+  assert(result.response.ok, `Create API key failed: ${JSON.stringify(result.json)}`);
+  assert(result.json?.result?.data?.rawKey, 'API key response missing rawKey');
   return result.json.result.data.rawKey as string;
 }
 
@@ -160,17 +141,17 @@ async function withMockUpstream(
     response: {
       writeHead: (statusCode: number, headers?: Record<string, string>) => void;
       end: (body?: string) => void;
-    },
+    }
   ) => void,
-  run: (baseUrl: string) => Promise<void>,
+  run: (baseUrl: string) => Promise<void>
 ) {
   const server = createServer(async (req, res) => {
-    if (req.method !== "POST" || req.url !== "/v1/chat/completions") {
+    if (req.method !== 'POST' || req.url !== '/v1/chat/completions') {
       res.writeHead(404).end();
       return;
     }
 
-    let body = "";
+    let body = '';
     for await (const chunk of req) {
       body += chunk;
     }
@@ -179,8 +160,8 @@ async function withMockUpstream(
   });
 
   await new Promise<void>((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => resolve());
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => resolve());
   });
 
   const address = server.address() as AddressInfo;
@@ -207,12 +188,12 @@ export async function withMockJsonUpstream(
     headers?: Record<string, string>;
     body: string;
   },
-  run: (baseUrl: string) => Promise<void>,
+  run: (baseUrl: string) => Promise<void>
 ) {
   await withMockUpstream((body, response) => {
     const result = handler(body);
     const status = result.status ?? 200;
-    const headers = result.headers ?? { "content-type": "application/json" };
+    const headers = result.headers ?? { 'content-type': 'application/json' };
     response.writeHead(status, headers);
     response.end(result.body);
   }, run);
@@ -220,14 +201,14 @@ export async function withMockJsonUpstream(
 
 export async function withMockSseUpstream(
   handler: (body: string) => string,
-  run: (baseUrl: string) => Promise<void>,
+  run: (baseUrl: string) => Promise<void>
 ) {
   await withMockUpstream((body, response) => {
     const payload = handler(body);
     response.writeHead(200, {
-      "content-type": "text/event-stream",
-      "cache-control": "no-cache",
-      connection: "keep-alive",
+      'content-type': 'text/event-stream',
+      'cache-control': 'no-cache',
+      connection: 'keep-alive',
     });
     response.end(payload);
   }, run);
