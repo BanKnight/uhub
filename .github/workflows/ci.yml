@@ -60,10 +60,13 @@ jobs:
           }
           trap cleanup EXIT
 
+          export UHUB_ADMIN_EMAIL="ci-admin@example.com"
+          export UHUB_ADMIN_PASSWORD="ci-admin-password-123"
+
           bun install --frozen-lockfile 2>&1 | tee artifacts/install.log
           bun run db:migrate:local 2>&1 | tee artifacts/db-migrate.log
 
-          bun --cwd apps/api-worker run dev -- --config wrangler.jsonc --port 8797 > artifacts/worker.log 2>&1 &
+          bun --cwd apps/api-worker run dev -- --config wrangler.jsonc --port 8797 --var ADMIN_EMAIL:$UHUB_ADMIN_EMAIL --var ADMIN_PASSWORD:$UHUB_ADMIN_PASSWORD > artifacts/worker.log 2>&1 &
           echo $! > artifacts/worker.pid
 
           export UHUB_WORKER_BASE_URL="http://127.0.0.1:8797"

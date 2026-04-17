@@ -8,7 +8,6 @@ export const ADMIN_EMAIL =
   process.env.UHUB_ADMIN_EMAIL ?? "admin@example.com";
 export const ADMIN_PASSWORD =
   process.env.UHUB_ADMIN_PASSWORD ?? "admin123456";
-export const ADMIN_NAME = process.env.UHUB_ADMIN_NAME ?? "Admin";
 
 export function assert(
   condition: unknown,
@@ -73,15 +72,6 @@ export async function requestJson(
 }
 
 export async function ensureAdminSession() {
-  await requestJson("/api/auth/sign-up/email", {
-    method: "POST",
-    body: JSON.stringify({
-      email: ADMIN_EMAIL,
-      password: ADMIN_PASSWORD,
-      name: ADMIN_NAME,
-    }),
-  }).catch(() => null);
-
   const signIn = await requestJson("/api/auth/sign-in/email", {
     method: "POST",
     body: JSON.stringify({

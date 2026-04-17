@@ -2,7 +2,7 @@ import type { FetchCreateContextFnOptions } from "@trpc/server/adapters/fetch";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { createAuth } from "./auth/better-auth";
+import { createAuth, ensureAdminAccount } from "./auth/better-auth";
 import { getDb } from "./db/schema";
 import { ApiKeyConcurrencyDurableObject } from "./durable-objects/api-key-concurrency-do";
 import { appRouter } from "./routers";
@@ -15,6 +15,8 @@ import { portalRequestsRouter } from "./routers/portal/requests";
 export type WorkerEnv = {
   DB: D1Database;
   API_KEY_CONCURRENCY: DurableObjectNamespace;
+  ADMIN_EMAIL?: string;
+  ADMIN_PASSWORD?: string;
 };
 
 const app = new Hono<{ Bindings: WorkerEnv }>();
@@ -65,6 +67,7 @@ app.get("/healthz", (c) => c.json({ ok: true }));
 
 app.all("/api/auth/*", async (c) => {
   const db = getDb(c.env);
+  await ensureAdminAccount(db, c.env);
   const auth = createAuth(db);
   return auth.handler(c.req.raw);
 });

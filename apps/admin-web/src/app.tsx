@@ -84,9 +84,8 @@ function RootLayout() {
 function SignInPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [name, setName] = React.useState("Admin");
-  const [email, setEmail] = React.useState("admin@example.com");
-  const [password, setPassword] = React.useState("admin123456");
+  const [email, setEmail] = React.useState("");
+  const [password, setPassword] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
 
   const signInMutation = useMutation({
@@ -98,20 +97,10 @@ function SignInPage() {
         return session;
       }
 
-      const signUpResult = await adminAuthClient.signUp
-        .email({
-          name,
-          email,
-          password,
-        })
-        .catch(() => null);
-
-      if (!signUpResult) {
-        await adminAuthClient.signIn.email({
-          email,
-          password,
-        });
-      }
+      await adminAuthClient.signIn.email({
+        email,
+        password,
+      });
 
       return getAdminSession();
     },
@@ -131,21 +120,13 @@ function SignInPage() {
   return (
     <section>
       <h2>Sign in</h2>
-      <p>Minimal Better Auth admin shell.</p>
+      <p>Sign in with the configured admin account.</p>
       <form
         onSubmit={(event) => {
           event.preventDefault();
           signInMutation.mutate();
         }}
       >
-        <div>
-          <label htmlFor="admin-name">Name</label>
-          <input
-            id="admin-name"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-          />
-        </div>
         <div>
           <label htmlFor="admin-email">Email</label>
           <input
