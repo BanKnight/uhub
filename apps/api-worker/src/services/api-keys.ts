@@ -1,5 +1,5 @@
 import { TRPCError } from '@trpc/server';
-import { desc, eq, inArray } from 'drizzle-orm';
+import { asc, desc, eq, inArray } from 'drizzle-orm';
 import type { ApiKey, CreateApiKeyInput, CreateApiKeyResult } from '@uhub/shared';
 import { apiKeyChannelRules, apiKeyEndpointRules, apiKeys, channels, getDb } from '../db/schema';
 import type { WorkerEnv } from '../index';
@@ -45,7 +45,11 @@ function buildPrefix(rawKey: string) {
 async function getRules(env: WorkerEnv, apiKeyId: string) {
   const db = getDb(env);
   const [channelRules, endpointRules] = await Promise.all([
-    db.select().from(apiKeyChannelRules).where(eq(apiKeyChannelRules.apiKeyId, apiKeyId)),
+    db
+      .select()
+      .from(apiKeyChannelRules)
+      .where(eq(apiKeyChannelRules.apiKeyId, apiKeyId))
+      .orderBy(asc(apiKeyChannelRules.position)),
     db.select().from(apiKeyEndpointRules).where(eq(apiKeyEndpointRules.apiKeyId, apiKeyId)),
   ]);
 
@@ -111,7 +115,10 @@ export async function listApiKeys(env: WorkerEnv): Promise<ApiKey[]> {
   return hydrated.filter((item): item is ApiKey => item !== null);
 }
 
-export async function createApiKey(env: WorkerEnv, input: CreateApiKeyInput): Promise<CreateApiKeyResult> {
+export async function createApiKey(
+  env: WorkerEnv,
+  input: CreateApiKeyInput
+): Promise<CreateApiKeyResult> {
   const db = getDb(env);
   const now = Date.now();
   const id = crypto.randomUUID();
@@ -136,9 +143,10 @@ export async function createApiKey(env: WorkerEnv, input: CreateApiKeyInput): Pr
   });
 
   await db.insert(apiKeyChannelRules).values(
-    channelIds.map((channelId) => ({
+    channelIds.map((channelId, index) => ({
       apiKeyId: id,
       channelId,
+      position: index,
     }))
   );
 
@@ -228,7 +236,10 @@ export async function rotateApiKey(env: WorkerEnv, apiKeyId: string): Promise<Cr
   });
 }
 
-export async function findApiKeyByRawKey(env: WorkerEnv, rawKey: string): Promise<ApiKeyLookup | null> {
+export async function findApiKeyByRawKey(
+  env: WorkerEnv,
+  rawKey: string
+): Promise<ApiKeyLookup | null> {
   const db = getDb(env);
   const keyHash = await sha256(rawKey);
   const row = await db.select().from(apiKeys).where(eq(apiKeys.keyHash, keyHash)).get();
@@ -238,7 +249,8 @@ export async function findApiKeyByRawKey(env: WorkerEnv, rawKey: string): Promis
   }
 
   const now = Date.now();
-  const computedStatus = typeof row.expiresAt === 'number' && row.expiresAt <= now ? 'expired' : row.status;
+  const computedStatus =
+    typeof row.expiresAt === 'number' && row.expiresAt <= now ? 'expired' : row.status;
   const rules = await getRules(env, row.id);
 
   return {

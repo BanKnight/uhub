@@ -185,6 +185,13 @@
 - admin tRPC 若要依赖 cookie session，前端 tRPC link 必须显式带 `credentials: 'include'`，后端 `/trpc/*` 也必须返回带 credentials 的 CORS
 
 ## Current status
-- Milestone 8 第二批已完成最小动态验证：rotate 后旧 key 返回 `401`、新 key 返回 `200`，analytics/audit 均可读取最新 requests 数据
-- 当前工作分支：`milestone-8-foundations`
-- 待做：把 M8 第二批结果提交为独立 commit，并决定是否继续补更细的 dashboard / 审计能力
+- v2 Milestone 3 已完成最小 health-aware routing：gateway 现可在同一个 API key 允许多个 channel 时按优先级尝试，并对 upstream 5xx / timeout / network error 做最小跨 channel failover
+- 最新验证已通过：`apps/api-worker`、`packages/shared`、`apps/admin-web` 的 TypeScript 静态检查通过；并在 `http://127.0.0.1:8791` worker + `5005/5006` 双 mock upstream 上完成 failover 动态验证
+- 动态验证结果：第一次请求 `trace-failover-first` 先命中 primary 503，再自动切到 secondary 返回 `200 served-by-secondary-1`；第二次请求 `trace-failover-second` 直接命中 secondary 返回 `200 served-by-secondary-2`；计数显示 `primaryHits=1`、`secondaryHits=2`，证明失败 channel 已被短期冷却跳过
+- Anthropic protocol 兼容层已进一步补齐：`/anthropic/v1/messages` 现支持 `max_tokens`、`top_p`、`stop_sequences`、`metadata` 等常用字段；non-stream/stream 响应都包含 `usage`，命中 stop sequence 时会返回 `stop_reason=stop_sequence` 与对应 `stop_sequence`
+- 最新 Anthropic 协议验证结果：`trace-anthropic-protocol-nonstream-2` 返回 `text=Hello`、`stop_reason=stop_sequence`、`stop_sequence=<STOP>`、`usage={input_tokens:59,output_tokens:2}`；`trace-anthropic-protocol-stream-2` 返回 `text/event-stream`，`text_deltas=[Hello]`、`stop_reason=stop_sequence`、`stop_sequence=<STOP>`、`usage={input_tokens:63,output_tokens:2}`
+- block 输入兼容已补齐：`system` 现支持 text blocks 数组，`messages[].content` 支持 `tool_result` block；动态验证 `trace-anthropic-block-compat` 返回 `200`，证明 system blocks 与 tool_result blocks 已可被规整到当前最小转发链路
+- non-stream tool use 输出已补齐：当上游返回 `tool_calls` 时，Claude 响应会翻译为 `content=[{type:tool_use,...}]`，并返回 `stop_reason=tool_use`；动态验证 `trace-anthropic-tool-use-nonstream-3` 返回 `200`，`tool_use={id:toolu_mock_123,name:get_weather,input:{city:Shanghai,unit:celsius}}`
+- stream tool use 输出已补齐：当上游 streaming chunk 返回 `tool_calls` 时，Claude SSE 现会输出 `content_block_start(type=tool_use)`、`content_block_delta(type=input_json_delta)`、`content_block_stop`、`message_delta(stop_reason=tool_use)`、`message_stop`；动态验证 `trace-anthropic-tool-use-stream-events` 返回 `200 text/event-stream`
+- stream tool_call 分片兼容已补齐：当同一个 `tool_call` 的 arguments 被拆成多个 chunk 时，Claude SSE 会在同一个 `tool_use` block index 下连续输出多个 `input_json_delta`；动态验证 `trace-anthropic-tool-use-stream-chunked` 返回 `200 text/event-stream`，事件序列包含单个 `content_block_start(index=0)`、两个连续 `content_block_delta(index=0)`、`content_block_stop(index=0)` 与 `message_delta(stop_reason=tool_use)`
+- 当前待做：如要继续 v2，下一个自然阶段是补更完整 Anthropic stream 多 tool blocks / tool_result / text+tool 交织覆盖、更多 message content block types，或进一步持久化 health / scoring / retry policy

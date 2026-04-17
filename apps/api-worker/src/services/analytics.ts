@@ -4,9 +4,18 @@ import { channels, getDb, requests } from '../db/schema';
 import type { WorkerEnv } from '../index';
 
 const totalRequestsExpr = sql<number>`count(*)`.mapWith(Number);
-const completedRequestsExpr = sql<number>`coalesce(sum(case when ${requests.status} = 'completed' then 1 else 0 end), 0)`.mapWith(Number);
-const failedRequestsExpr = sql<number>`coalesce(sum(case when ${requests.status} = 'failed' then 1 else 0 end), 0)`.mapWith(Number);
-const rejectedRequestsExpr = sql<number>`coalesce(sum(case when ${requests.status} = 'rejected' then 1 else 0 end), 0)`.mapWith(Number);
+const completedRequestsExpr =
+  sql<number>`coalesce(sum(case when ${requests.status} = 'completed' then 1 else 0 end), 0)`.mapWith(
+    Number
+  );
+const failedRequestsExpr =
+  sql<number>`coalesce(sum(case when ${requests.status} = 'failed' then 1 else 0 end), 0)`.mapWith(
+    Number
+  );
+const rejectedRequestsExpr =
+  sql<number>`coalesce(sum(case when ${requests.status} = 'rejected' then 1 else 0 end), 0)`.mapWith(
+    Number
+  );
 const avgLatencyMsExpr = sql<number | null>`cast(avg(${requests.latencyMs}) as integer)`;
 
 function toNullableNumber(value: number | null) {

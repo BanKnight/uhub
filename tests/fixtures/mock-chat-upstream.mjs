@@ -12,19 +12,21 @@ const server = createServer(async (req, res) => {
   const payload = JSON.parse(body || '{}');
 
   res.writeHead(200, { 'content-type': 'application/json' });
-  res.end(JSON.stringify({
-    id: 'chatcmpl-local',
-    object: 'chat.completion',
-    created: Math.floor(Date.now() / 1000),
-    model: payload.model ?? 'demo-model',
-    choices: [
-      {
-        index: 0,
-        message: { role: 'assistant', content: 'mock response' },
-        finishReason: 'stop'
-      }
-    ]
-  }));
+  res.end(
+    JSON.stringify({
+      id: 'chatcmpl-local',
+      object: 'chat.completion',
+      created: Math.floor(Date.now() / 1000),
+      model: payload.model ?? 'demo-model',
+      choices: [
+        {
+          index: 0,
+          message: { role: 'assistant', content: 'mock response' },
+          finishReason: 'stop',
+        },
+      ],
+    })
+  );
 });
 
 server.listen(9090, '127.0.0.1', () => {

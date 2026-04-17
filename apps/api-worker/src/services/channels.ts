@@ -1,5 +1,9 @@
 import { eq } from 'drizzle-orm';
-import type { CreateChannelInput, UpdateChannelInput, UpdateChannelStatusInput } from '@uhub/shared';
+import type {
+  CreateChannelInput,
+  UpdateChannelInput,
+  UpdateChannelStatusInput,
+} from '@uhub/shared';
 import { channels, getDb } from '../db/schema';
 import type { WorkerEnv } from '../index';
 

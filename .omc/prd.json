@@ -359,6 +359,132 @@
         "revoke 后 /portal/me 或 /portal/requests 返回 401，raw key gateway 鉴权失效",
         "验证结果被记录到 progress.txt"
       ]
-    }
-  ]
-}
+    },
+    {
+      "id": "V2-M1-US1",
+      "title": "硬化 OpenAI chat completions 热路径的 stream、timeout 与错误归类",
+      "priority": 31,
+      "passes": true,
+      "acceptanceCriteria": [
+        "apps/api-worker/src/routers/gateway/chat-completions.ts 在 stream=true 时不再整包读取上游响应，而是透传 text/event-stream 响应体",
+        "non-stream 请求仍返回与当前 OpenAI-compatible 路径兼容的 JSON/文本响应",
+        "gateway 返回统一错误结构，至少可区分 invalid_request、auth_error、upstream_error、upstream_timeout、network_error",
+        "requests 落库可记录失败归类，并保留 traceId、httpStatus、requestSize、responseSize"
+      ]
+    },
+    {
+      "id": "V2-M1-US2",
+      "title": "验证 OpenAI 热路径硬化的动态链路",
+      "priority": 32,
+      "passes": true,
+      "acceptanceCriteria": [
+        "apps/api-worker 与 packages/shared 的 typecheck/build 通过",
+        "stream=false 的 chat completions 请求可继续成功返回 200",
+        "stream=true 的 chat completions 请求可返回 text/event-stream 并透传上游分块",
+        "timeout 场景返回稳定错误结构，且对应 requests/audit 可辨认失败类型",
+        "验证结果被记录到 progress.txt"
+      ]
+    },
+    {
+      "id": "V2-M2-US1",
+      "title": "增加 Claude-compatible messages 最小入口",
+      "priority": 33,
+      "passes": true,
+      "acceptanceCriteria": [
+        "apps/api-worker 提供 `/anthropic/v1/messages` 最小入口，并复用现有 gateway key auth、channel 选择、并发 lease 与 request log 骨架",
+        "Claude messages 请求可被转换为上游 `/v1/chat/completions` 请求，成功响应可被转换回最小 Claude message 响应结构",
+        "当前范围只要求最小 non-stream messages 流程，不提前实现完整 Anthropic streaming 事件协议",
+        "admin 侧可为 API key 选择 `anthropic_messages` endpoint rule"
+      ]
+    },
+    {
+      "id": "V2-M2-US2",
+      "title": "验证 Claude-compatible messages 最小链路",
+      "priority": 34,
+      "passes": true,
+      "acceptanceCriteria": [
+        "apps/api-worker、packages/shared、apps/admin-web 的 typecheck/build 通过",
+        "admin 可创建允许 `anthropic_messages` 的 API key",
+        "携带允许的 raw key 调用 `/anthropic/v1/messages` 返回 200 与最小 Claude message 响应结构",
+        "audit 可读到 `endpoint=anthropic_messages`、traceId、status=completed、httpStatus=200，且验证结果被记录到 progress.txt"
+      ]
+    },
+    {
+      "id": "V2-M2-US3",
+      "title": "补齐 Claude-compatible messages 的最小 streaming 翻译",
+      "priority": 35,
+      "passes": true,
+      "acceptanceCriteria": [
+        "`/anthropic/v1/messages` 在 `stream=true` 时返回 `text/event-stream`，并把上游 OpenAI-style SSE 翻译成最小 Anthropic Messages 事件序列",
+        "最小事件序列至少包含 `message_start`、`content_block_start`、`content_block_delta`、`content_block_stop`、`message_delta`、`message_stop`",
+        "文本增量可通过 `content_block_delta.delta.type=text_delta` 正常输出，结束原因会映射到 Claude 风格 `stop_reason`",
+        "request log / audit 继续记录 `endpoint=anthropic_messages`、traceId、status 与 httpStatus"
+      ]
+    },
+    {
+      "id": "V2-M3-US1",
+      "title": "增加最小 health-aware routing 与跨 channel failover",
+      "priority": 36,
+      "passes": true,
+      "acceptanceCriteria": [
+        "当同一个 API key 允许多个 active channel 时，gateway 会按优先级顺序尝试 channel，而不是固定只用第一个 channel",
+        "对 timeout、network error 与 upstream 5xx，gateway 可在仍未回包前自动切到下一个允许 channel 重试",
+        "刚失败的 channel 会进入短暂冷却期，后续请求会优先跳过它",
+        "同一次请求仍只保留一条 requests/audit 记录，并反映最终成功 channel"
+      ]
+    },
+    {
+      "id": "V2-M3-US2",
+      "title": "补齐 Anthropic messages 的常用协议字段与 stop/usage 语义",
+      "priority": 37,
+      "passes": true,
+      "acceptanceCriteria": [
+        "`/anthropic/v1/messages` 请求至少接受并处理 `max_tokens`、`top_p`、`stop_sequences`、`metadata` 等常用字段（允许最小透传或本地兼容）",
+        "non-stream 响应包含 `usage`，且在命中 stop sequence 时返回 `stop_reason=stop_sequence` 与对应 `stop_sequence`",
+        "stream 响应中的 `message_start`/`message_delta` 带有 `usage`，并在命中 stop sequence 时返回正确的 `stop_reason` 与 `stop_sequence`",
+        "对应动态验证结果被记录到 progress.txt"
+      ]
+    },
+    {
+      "id": "V2-M3-US3",
+      "title": "补齐 Anthropic messages 的 block 输入兼容",
+      "priority": 38,
+      "passes": true,
+      "acceptanceCriteria": [
+        "`system` 支持 text blocks 数组输入，并可被规整到当前最小转发链路",
+        "`messages[].content` 支持 `tool_result` block，并可被规整为可转发文本而不报 schema 错误",
+        "对应动态验证结果被记录到 progress.txt"
+      ]
+    },
+    {
+      "id": "V2-M3-US4",
+      "title": "补齐 Anthropic messages 的 non-stream tool_use 输出",
+      "priority": 39,
+      "passes": true,
+      "acceptanceCriteria": [
+        "当上游 OpenAI chat completion 返回 `tool_calls` 时，`/anthropic/v1/messages` 的 non-stream 响应会翻译为 Claude `tool_use` content block",
+        "tool call 的 `function.arguments` 会被尽量解析为结构化 `input` 对象，无法解析时至少保底为可消费对象",
+        "存在 `tool_use` block 时，响应会返回 `stop_reason=tool_use`，且对应动态验证结果被记录到 progress.txt"
+      ]
+    },
+    {
+      "id": "V2-M3-US5",
+      "title": "补齐 Anthropic messages 的 stream tool_use 输出",
+      "priority": 40,
+      "passes": true,
+      "acceptanceCriteria": [
+        "当上游 OpenAI streaming chunk 返回 `tool_calls` 增量时，`/anthropic/v1/messages` 会输出 Claude 风格 `tool_use` block 事件序列",
+        "最小事件序列至少包含 `content_block_start(type=tool_use)`、`content_block_delta(type=input_json_delta)`、`content_block_stop`、`message_delta(stop_reason=tool_use)`、`message_stop`",
+        "对应动态验证结果被记录到 progress.txt"
+      ]
+    },
+    {
+      "id": "V2-M3-US6",
+      "title": "补齐 Anthropic messages 的 stream tool_call 分片兼容",
+      "priority": 41,
+      "passes": true,
+      "acceptanceCriteria": [
+        "当上游将同一个 `tool_call` 的 `function.arguments` 拆成多个 streaming chunk 时，`/anthropic/v1/messages` 仍会聚合到同一个 Claude `tool_use` block index",
+        "分片场景下会连续输出多个 `content_block_delta(type=input_json_delta)`，并保持单个 `content_block_start`/`content_block_stop` 配对",
+        "对应动态验证结果被记录到 progress.txt"
+      ]

@@ -1,4 +1,4 @@
-import type { GatewayEndpoint, GatewayRequestStatus } from '@uhub/shared';
+import type { GatewayEndpoint, GatewayFailureClass, GatewayRequestStatus } from '@uhub/shared';
 import type { WorkerEnv } from '../../index';
 import { createRequestRecord, finishRequestRecord } from '../../repositories/requests-repo';
 
@@ -15,8 +15,11 @@ export type RequestLogFinishInput = {
   id: string;
   startedAt: number;
   status: GatewayRequestStatus;
-  httpStatus: number;
+  failureClass: GatewayFailureClass | null;
+  channelId?: string | null;
+  httpStatus: number | null;
   responseBody: string | null;
+  responseSize?: number | null;
 };
 
 export function getTraceId(request: Request) {
@@ -42,8 +45,10 @@ export function finishRequestLog(env: WorkerEnv, input: RequestLogFinishInput) {
   return finishRequestRecord(env, {
     id: input.id,
     status: input.status,
+    failureClass: input.failureClass,
+    channelId: input.channelId,
     httpStatus: input.httpStatus,
     latencyMs: Date.now() - input.startedAt,
-    responseSize: getBodySize(input.responseBody),
+    responseSize: input.responseSize ?? getBodySize(input.responseBody),
   });
 }

@@ -30,8 +30,12 @@ export const accounts = sqliteTable('account', {
   accessToken: text('accessToken'),
   refreshToken: text('refreshToken'),
   idToken: text('idToken'),
-  accessTokenExpiresAt: integer('accessTokenExpiresAt', { mode: 'timestamp_ms' }),
-  refreshTokenExpiresAt: integer('refreshTokenExpiresAt', { mode: 'timestamp_ms' }),
+  accessTokenExpiresAt: integer('accessTokenExpiresAt', {
+    mode: 'timestamp_ms',
+  }),
+  refreshTokenExpiresAt: integer('refreshTokenExpiresAt', {
+    mode: 'timestamp_ms',
+  }),
   scope: text('scope'),
   password: text('password'),
   createdAt: integer('createdAt', { mode: 'timestamp_ms' }).notNull(),
@@ -63,7 +67,9 @@ export const apiKeys = sqliteTable('api_keys', {
   label: text('label').notNull(),
   keyPrefix: text('key_prefix').notNull().unique(),
   keyHash: text('key_hash').notNull().unique(),
-  status: text('status', { enum: ['active', 'disabled', 'expired', 'revoked'] }).notNull(),
+  status: text('status', {
+    enum: ['active', 'disabled', 'expired', 'revoked'],
+  }).notNull(),
   expiresAt: integer('expires_at'),
   maxConcurrency: integer('max_concurrency').notNull(),
   createdByAdminId: text('created_by_admin_id').notNull(),
@@ -78,6 +84,7 @@ export const apiKeyChannelRules = sqliteTable(
   {
     apiKeyId: text('api_key_id').notNull(),
     channelId: text('channel_id').notNull(),
+    position: integer('position').notNull(),
   },
   (table) => [primaryKey({ columns: [table.apiKeyId, table.channelId] })]
 );
@@ -86,7 +93,9 @@ export const apiKeyEndpointRules = sqliteTable(
   'api_key_endpoint_rules',
   {
     apiKeyId: text('api_key_id').notNull(),
-    endpoint: text('endpoint', { enum: ['openai_chat_completions'] }).notNull(),
+    endpoint: text('endpoint', {
+      enum: ['openai_chat_completions', 'anthropic_messages'],
+    }).notNull(),
   },
   (table) => [primaryKey({ columns: [table.apiKeyId, table.endpoint] })]
 );
@@ -107,7 +116,12 @@ export const requests = sqliteTable('requests', {
   model: text('model'),
   channelId: text('channel_id'),
   traceId: text('trace_id'),
-  status: text('status', { enum: ['pending', 'processing', 'completed', 'failed', 'rejected'] }).notNull(),
+  status: text('status', {
+    enum: ['pending', 'processing', 'completed', 'failed', 'rejected'],
+  }).notNull(),
+  failureClass: text('failure_class', {
+    enum: ['invalid_request', 'auth_error', 'upstream_error', 'upstream_timeout', 'network_error'],
+  }),
   httpStatus: integer('http_status'),
   latencyMs: integer('latency_ms'),
   requestSize: integer('request_size'),
