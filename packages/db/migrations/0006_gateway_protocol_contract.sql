@@ -7,7 +7,12 @@ CREATE TABLE api_key_endpoint_rules (
 );
 
 INSERT INTO api_key_endpoint_rules (api_key_id, endpoint)
-SELECT api_key_id, endpoint
+SELECT
+  api_key_id,
+  CASE
+    WHEN endpoint = 'chat_completions' THEN 'openai_chat_completions'
+    ELSE endpoint
+  END
 FROM api_key_endpoint_rules_old;
 
 DROP TABLE api_key_endpoint_rules_old;

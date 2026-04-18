@@ -46,7 +46,9 @@ const sessionQueryKey = ['admin', 'session'];
 const initialChannelForm: CreateChannelInput = {
   name: '',
   provider: '',
+  protocol: 'openai_chat_completions',
   baseUrl: 'https://example.com',
+  models: [],
   status: 'active',
   configJson: '{}',
 };
@@ -56,6 +58,9 @@ const initialApiKeyForm: CreateApiKeyInput = {
   endpointRules: ['openai_chat_completions'],
   maxConcurrency: 1,
   expiresAt: null,
+  quota: {
+    requestLimit: null,
+  },
 };
 
 const endpointOptions: CreateApiKeyInput['endpointRules'] = [
@@ -63,6 +68,19 @@ const endpointOptions: CreateApiKeyInput['endpointRules'] = [
   'anthropic_messages',
   'gemini_contents',
 ];
+
+const protocolOptions: CreateChannelInput['protocol'][] = [
+  'openai_chat_completions',
+  'anthropic_messages',
+  'gemini_contents',
+];
+
+function parseModelsInput(value: string) {
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
 
 function parseExpiresAtInput(value: string) {
   if (!value) {
@@ -324,6 +342,8 @@ function ChannelsPage() {
   const queryClient = useQueryClient();
   const [form, setForm] = React.useState<CreateChannelInput>(initialChannelForm);
   const [apiKeyForm, setApiKeyForm] = React.useState<CreateApiKeyInput>(initialApiKeyForm);
+  const [modelsInput, setModelsInput] = React.useState('');
+  const [requestQuotaInput, setRequestQuotaInput] = React.useState('');
   const [expiresAtInput, setExpiresAtInput] = React.useState('');
   const [createdRawKey, setCreatedRawKey] = React.useState<string | null>(null);
   const [auditFilters, setAuditFilters] = React.useState({
@@ -379,6 +399,7 @@ function ChannelsPage() {
     mutationFn: (input: CreateChannelInput) => createChannelRequest(input),
     onSuccess: async () => {
       setForm({ ...initialChannelForm });
+      setModelsInput('');
       await queryClient.invalidateQueries({ queryKey: channelsQueryKey });
     },
   });
@@ -396,6 +417,7 @@ function ChannelsPage() {
     onSuccess: async (result) => {
       setCreatedRawKey(result.rawKey);
       setApiKeyForm({ ...initialApiKeyForm });
+      setRequestQuotaInput('');
       setExpiresAtInput('');
       await queryClient.invalidateQueries({ queryKey: apiKeysQueryKey });
     },
@@ -448,7 +470,10 @@ function ChannelsPage() {
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          createChannelMutation.mutate({ ...form });
+          createChannelMutation.mutate({
+            ...form,
+            models: parseModelsInput(modelsInput),
+          });
         }}
       >
         <div>
@@ -471,6 +496,25 @@ function ChannelsPage() {
               }))
             }
           />
+        </div>
+        <div>
+          <label htmlFor="channel-protocol">Protocol</label>
+          <select
+            id="channel-protocol"
+            value={form.protocol}
+            onChange={(event) =>
+              setForm((current) => ({
+                ...current,
+                protocol: event.target.value as CreateChannelInput['protocol'],
+              }))
+            }
+          >
+            {protocolOptions.map((protocol) => (
+              <option key={protocol} value={protocol}>
+                {protocol}
+              </option>
+            ))}
+          </select>
         </div>
         <div>
           <label htmlFor="channel-base-url">Base URL</label>
@@ -500,6 +544,15 @@ function ChannelsPage() {
             <option value="active">active</option>
             <option value="disabled">disabled</option>
           </select>
+        </div>
+        <div>
+          <label htmlFor="channel-models">Models</label>
+          <input
+            id="channel-models"
+            value={modelsInput}
+            onChange={(event) => setModelsInput(event.target.value)}
+            placeholder="gpt-4o-mini, claude-3-5-sonnet, gemini-2.5-flash"
+          />
         </div>
         <div>
           <label htmlFor="channel-config-json">Config JSON</label>
@@ -532,7 +585,9 @@ function ChannelsPage() {
             <li key={channel.id}>
               <strong>{channel.name}</strong>
               <div>Provider: {channel.provider}</div>
+              <div>Protocol: {channel.protocol}</div>
               <div>Base URL: {channel.baseUrl}</div>
+              <div>Models: {channel.models.length > 0 ? channel.models.join(', ') : 'n/a'}</div>
               <div>Status: {channel.status}</div>
               <button
                 type="button"
@@ -560,6 +615,9 @@ function ChannelsPage() {
             createApiKeyMutation.mutate({
               ...apiKeyForm,
               expiresAt: parseExpiresAtInput(expiresAtInput),
+              quota: {
+                requestLimit: requestQuotaInput ? Number(requestQuotaInput) : null,
+              },
             });
           }}
         >
@@ -631,6 +689,17 @@ function ChannelsPage() {
             />
           </div>
           <div>
+            <label htmlFor="api-key-request-quota">Request quota</label>
+            <input
+              id="api-key-request-quota"
+              type="number"
+              min={1}
+              value={requestQuotaInput}
+              onChange={(event) => setRequestQuotaInput(event.target.value)}
+              placeholder="Unlimited if empty"
+            />
+          </div>
+          <div>
             <label htmlFor="api-key-expires-at">Expires at</label>
             <input
               id="api-key-expires-at"
@@ -663,6 +732,7 @@ function ChannelsPage() {
               <div>Prefix: {apiKey.keyPrefix}</div>
               <div>Status: {apiKey.status}</div>
               <div>Max concurrency: {apiKey.maxConcurrency}</div>
+              <div>Request quota: {apiKey.quota.requestLimit ?? 'unlimited'}</div>
               <div>Endpoints: {apiKey.endpointRules.join(', ')}</div>
               <div>Channels: {apiKey.channelIds.join(', ')}</div>
               <div>

@@ -10,6 +10,10 @@ export const endpointRuleSchema = z.enum([
 const usageCountSchema = z.number().int().nonnegative();
 const nullableUsageMetricSchema = z.number().nullable();
 
+export const apiKeyQuotaSchema = z.object({
+  requestLimit: z.number().int().positive().nullable(),
+});
+
 export const apiKeyUsageSummarySchema = z.object({
   totalRequests: usageCountSchema,
   successRequests: usageCountSchema,
@@ -37,6 +41,7 @@ export const apiKeySchema = z.object({
   updatedAt: z.number(),
   channelIds: z.array(z.string()),
   endpointRules: z.array(endpointRuleSchema),
+  quota: apiKeyQuotaSchema,
 });
 
 export const portalOverviewSchema = z.object({
@@ -50,6 +55,7 @@ export const createApiKeyInputSchema = z.object({
   endpointRules: z.array(endpointRuleSchema).min(1),
   maxConcurrency: z.number().int().positive(),
   expiresAt: z.number().int().positive().nullable().optional(),
+  quota: apiKeyQuotaSchema.optional(),
 });
 
 export const createApiKeyResultSchema = z.object({
@@ -76,6 +82,7 @@ export const portalExchangeResultSchema = z.object({
   expiresAt: z.number(),
 });
 
+export type ApiKeyQuota = z.infer<typeof apiKeyQuotaSchema>;
 export type ApiKeyUsageSummary = z.infer<typeof apiKeyUsageSummarySchema>;
 export type ApiKey = z.infer<typeof apiKeySchema>;
 export type PortalOverview = z.infer<typeof portalOverviewSchema>;

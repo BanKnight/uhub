@@ -81,6 +81,8 @@ export async function createChannel(
     name: string;
     baseUrl: string;
     provider?: string;
+    protocol?: 'openai_chat_completions' | 'anthropic_messages' | 'gemini_contents';
+    models?: string[];
     status?: 'active' | 'disabled';
     configJson?: string;
   }
@@ -92,7 +94,9 @@ export async function createChannel(
       body: JSON.stringify({
         name: input.name,
         provider: input.provider ?? 'openai-compatible',
+        protocol: input.protocol ?? 'openai_chat_completions',
         baseUrl: input.baseUrl,
+        models: input.models ?? [],
         status: input.status ?? 'active',
         configJson: input.configJson ?? '{}',
       }),
@@ -113,6 +117,7 @@ export async function createApiKey(
     endpointRules: string[];
     maxConcurrency?: number;
     expiresAt?: number | null;
+    quota?: { requestLimit: number | null };
   }
 ) {
   const result = await requestJson(
@@ -125,6 +130,7 @@ export async function createApiKey(
         endpointRules: input.endpointRules,
         maxConcurrency: input.maxConcurrency ?? 1,
         expiresAt: input.expiresAt ?? null,
+        quota: input.quota,
       }),
     },
     cookie

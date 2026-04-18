@@ -191,10 +191,10 @@
 - Phase 1 第一批最小 contract 已落地：API key endpoint rule 扩展为 `openai_chat_completions` / `anthropic_messages` / `gemini_contents`，portal `/me` 改为稳定 `overview(apiKey + usage)` contract，request 写入时会回填 `api_keys.last_used_at`，shared schema 已补 Gemini contents request/response 最小 shape。
 - Gemini 最小 non-stream 入口已进入主链路：worker 新增 `/v1beta/models/:model:generateContent`，当前通过 OpenAI-compatible 上游做最小请求/响应翻译，不支持 stream；并新增 `tests/integration/gemini-nonstream.ts` 作为第一条 Gemini happy-path 集成验证。
 - Phase 2 第一批测试收口已完成：新增 `tests/integration/openai-nonstream.ts`，根 `package.json` 新增 `test:integration` / `test:integration:openai` / `test:integration:anthropic` / `test:integration:gemini` 聚合入口，CI 已拆成 `integration-openai` / `integration-anthropic` / `integration-gemini` 三个 job，统一采用 worker 启动 + migration + artifacts 上传模式。
-- admin-web 与 key-portal 已对齐新 contract：admin API key 发放/审计筛选可识别 `gemini_contents`，portal 可显示 usage/quota 占位字段与 last used time。
-- DB 基线已对齐到新协议枚举：`packages/db/migrations/0001_init.sql` 与新增 `packages/db/migrations/0006_gateway_protocol_contract.sql` 已覆盖 endpoint rule contract 变更。
-- 最新动态验证已通过：受控本地 worker `http://127.0.0.1:8798` 下，`bun --cwd /data/workspace/uhub test:integration:openai` 与 `bun --cwd /data/workspace/uhub test:integration:gemini` 返回 `status=ok`；全仓 `bun --cwd /data/workspace/uhub check` 成功。
-- 参考 AxonHub 后确认：下一阶段真正缺口不是继续深挖 Anthropic，而是 Gemini stream/更完整 contract 仍缺位、portal quota 仍是 null contract、admin 的上游/模型配置仍偏薄、测试体系还没有最小 e2e。
+- Phase 4 第一批产品面已完成：API key 新增结构化 `quota.requestLimit`，portal usage 真实返回 `quotaLimit/quotaUsed/quotaRemaining`；channel 新增结构化 `protocol + models` 字段，admin-web 创建与列表 UI 已改为直接编辑和展示这些字段，不再只依赖 `configJson`。
+- DB 基线与增量迁移已对齐：`packages/db/migrations/0001_init.sql`、`0006_gateway_protocol_contract.sql`、`0007_phase4_product_fields.sql` 均已覆盖当前 schema，并修正了历史 `chat_completions -> openai_chat_completions` 迁移兼容。
+- 最新动态验证已通过：受控本地 worker `http://127.0.0.1:8798` 下，`bun --cwd /data/workspace/uhub test:integration:openai`、`test:integration:gemini`、`test:integration:portal:overview-quota` 均返回 `status=ok`；portal quota 验证结果为 `quotaLimit=1`、`quotaUsed=1`、`quotaRemaining=0`；全仓 `bun --cwd /data/workspace/uhub check` 成功。
+- 参考 AxonHub 后确认：下一阶段真正缺口不是继续深挖 Anthropic，而是 Gemini stream/更完整 contract 仍缺位、admin 结构化模型配置仍偏最小、测试体系还没有最小 e2e。
 - 当前建议执行顺序已更新为：Phase 1 冻结 openai/anthropic/gemini 三协议最小抽象与 canonical usage contract；Phase 2 重组 integration/e2e/CI；Phase 3 落 Gemini 最小协议入口；Phase 4 补 portal 份额/使用情况与 admin 结构化模型配置；Phase 5 升级 CI 为三协议 contract matrix + 最小 e2e。
 - 已新增 OMC 计划文件：`/data/workspace/uhub/.omc/plans/2026-04-18-axonhub-gap-alignment-plan.md`。
-- 当前待做：如果继续执行，应优先补 portal quota 真实语义与 admin 结构化模型配置，并在其后补最小 e2e 收口。
+- 当前待做：如果继续执行，应优先补最小 e2e 收口，把“admin 创建 channel/key -> 用户发请求 -> portal 看 usage/history”固化为单条主链路验证。

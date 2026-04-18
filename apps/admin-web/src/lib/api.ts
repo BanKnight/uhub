@@ -10,6 +10,7 @@ import type {
   CreateChannelInput,
   RevokeApiKeyInput,
   RotateApiKeyInput,
+  UpdateChannelInput,
   UpdateChannelStatusInput,
 } from '@uhub/shared';
 
@@ -37,6 +38,10 @@ export function listChannels() {
 
 export function createChannel(input: CreateChannelInput) {
   return client.mutation('admin.channels.create', input) as Promise<Channel>;
+}
+
+export function updateChannel(input: UpdateChannelInput) {
+  return client.mutation('admin.channels.update', input) as Promise<Channel>;
 }
 
 export function updateChannelStatus(input: UpdateChannelStatusInput) {

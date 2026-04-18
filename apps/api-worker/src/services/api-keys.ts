@@ -24,6 +24,7 @@ type ApiKeyLookup = {
   status: 'active' | 'disabled' | 'expired' | 'revoked';
   expiresAt: number | null;
   maxConcurrency: number;
+  requestQuotaLimit: number | null;
   createdByAdminId: string;
   lastUsedAt: number | null;
   revokedAt: number | null;
@@ -94,6 +95,9 @@ async function hydrateApiKey(env: WorkerEnv, apiKeyId: string): Promise<ApiKey |
     updatedAt: row.updatedAt,
     channelIds: rules.channelIds,
     endpointRules: rules.endpointRules,
+    quota: {
+      requestLimit: row.requestQuotaLimit ?? null,
+    },
   };
 }
 
@@ -124,30 +128,36 @@ export async function getApiKeyUsageSummary(
   apiKeyId: string
 ): Promise<ApiKeyUsageSummary> {
   const db = getDb(env);
-  const [overview] = await db
-    .select({
-      totalRequests: sql<number>`count(*)`.mapWith(Number),
-      successRequests:
-        sql<number>`coalesce(sum(case when ${requests.status} = 'completed' then 1 else 0 end), 0)`.mapWith(
-          Number
-        ),
-      failedRequests:
-        sql<number>`coalesce(sum(case when ${requests.status} = 'failed' then 1 else 0 end), 0)`.mapWith(
-          Number
-        ),
-      rejectedRequests:
-        sql<number>`coalesce(sum(case when ${requests.status} = 'rejected' then 1 else 0 end), 0)`.mapWith(
-          Number
-        ),
-      lastUsedAt: sql<number | null>`max(${requests.createdAt})`,
-    })
-    .from(requests)
-    .where(eq(requests.apiKeyId, apiKeyId));
+  const [apiKey, overview] = await Promise.all([
+    db.select().from(apiKeys).where(eq(apiKeys.id, apiKeyId)).get(),
+    db
+      .select({
+        totalRequests: sql<number>`count(*)`.mapWith(Number),
+        successRequests:
+          sql<number>`coalesce(sum(case when ${requests.status} = 'completed' then 1 else 0 end), 0)`.mapWith(
+            Number
+          ),
+        failedRequests:
+          sql<number>`coalesce(sum(case when ${requests.status} = 'failed' then 1 else 0 end), 0)`.mapWith(
+            Number
+          ),
+        rejectedRequests:
+          sql<number>`coalesce(sum(case when ${requests.status} = 'rejected' then 1 else 0 end), 0)`.mapWith(
+            Number
+          ),
+        lastUsedAt: sql<number | null>`max(${requests.createdAt})`,
+      })
+      .from(requests)
+      .where(eq(requests.apiKeyId, apiKeyId))
+      .get(),
+  ]);
 
+  const totalRequests = overview?.totalRequests ?? 0;
+  const requestLimit = apiKey?.requestQuotaLimit ?? null;
   const lastUsedAt = overview && overview.lastUsedAt !== null ? Number(overview.lastUsedAt) : null;
 
   return {
-    totalRequests: overview?.totalRequests ?? 0,
+    totalRequests,
     successRequests: overview?.successRequests ?? 0,
     failedRequests: overview?.failedRequests ?? 0,
     rejectedRequests: overview?.rejectedRequests ?? 0,
@@ -155,9 +165,9 @@ export async function getApiKeyUsageSummary(
     outputTokens: null,
     totalTokens: null,
     lastUsedAt,
-    quotaLimit: null,
-    quotaUsed: null,
-    quotaRemaining: null,
+    quotaLimit: requestLimit,
+    quotaUsed: totalRequests,
+    quotaRemaining: requestLimit === null ? null : Math.max(requestLimit - totalRequests, 0),
   };
 }
 
@@ -189,6 +199,7 @@ export async function createApiKey(
     status: 'active',
     expiresAt: input.expiresAt ?? null,
     maxConcurrency: input.maxConcurrency,
+    requestQuotaLimit: input.quota?.requestLimit ?? null,
     createdByAdminId: 'bootstrap-admin',
     lastUsedAt: null,
     revokedAt: null,
@@ -287,6 +298,9 @@ export async function rotateApiKey(env: WorkerEnv, apiKeyId: string): Promise<Cr
     endpointRules: rules.endpointRules,
     maxConcurrency: existing.maxConcurrency,
     expiresAt: existing.expiresAt ?? null,
+    quota: {
+      requestLimit: existing.requestQuotaLimit ?? null,
+    },
   });
 }
 
@@ -315,6 +329,7 @@ export async function findApiKeyByRawKey(
     status: row.status,
     expiresAt: row.expiresAt ?? null,
     maxConcurrency: row.maxConcurrency,
+    requestQuotaLimit: row.requestQuotaLimit ?? null,
     createdByAdminId: row.createdByAdminId,
     lastUsedAt: row.lastUsedAt ?? null,
     revokedAt: row.revokedAt ?? null,
