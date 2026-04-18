@@ -38,7 +38,8 @@
     "test:integration:anthropic:tools-request": "bun tests/integration/anthropic-tools-request.ts",
     "test:integration:gemini": "bun run test:integration:gemini:nonstream",
     "test:integration:gemini:nonstream": "bun tests/integration/gemini-nonstream.ts",
-    "test:integration:portal:overview-quota": "bun tests/integration/portal-overview-quota.ts"
+    "test:integration:portal:overview-quota": "bun tests/integration/portal-overview-quota.ts",
+    "test:e2e:core": "bun tests/e2e/core-flow.ts"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx,json}": [

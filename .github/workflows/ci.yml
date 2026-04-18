@@ -168,9 +168,49 @@ jobs:
 
           bun run test:integration:gemini 2>&1 | tee artifacts/gemini.log
 
-      - name: Upload Gemini artifacts
+  e2e-core:
+    runs-on: ubuntu-latest
+    needs: quality
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Run core e2e suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+
+          cleanup() {
+            if [ -f artifacts/worker.pid ]; then
+              kill "$(cat artifacts/worker.pid)" 2>/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+
+          export UHUB_ADMIN_EMAIL="ci-admin@example.com"
+          export UHUB_ADMIN_PASSWORD="ci-admin-password-123"
+
+          bun install --frozen-lockfile 2>&1 | tee artifacts/install.log
+          bun run db:migrate:local 2>&1 | tee artifacts/db-migrate.log
+
+          bun run --cwd apps/api-worker dev -- --config wrangler.jsonc --port 8797 --var ADMIN_EMAIL:$UHUB_ADMIN_EMAIL --var ADMIN_PASSWORD:$UHUB_ADMIN_PASSWORD > artifacts/worker.log 2>&1 &
+          echo $! > artifacts/worker.pid
+
+          export UHUB_WORKER_BASE_URL="http://127.0.0.1:8797"
+          timeout 30 bash -lc 'until curl -fsS "$UHUB_WORKER_BASE_URL/healthz"; do sleep 1; done'
+
+          bun run test:e2e:core 2>&1 | tee artifacts/e2e-core.log
+
+      - name: Upload core e2e artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: gemini-integration-artifacts
+          name: e2e-core-artifacts
           path: artifacts/
