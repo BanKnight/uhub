@@ -189,10 +189,12 @@
 - 个人版 AxonHub 的 MVP 主链路基本已成立：admin 登录、channel 管理、API key create/revoke/rotate、portal exchange/overview/history、`/v1/chat/completions`、基础 analytics/audit、concurrency 429、failover 最小能力都已存在。
 - Anthropic 兼容层现已覆盖：non-stream / stream text、stop_sequence / usage、system text blocks、tool_result 输入规整、request-side tools / tool_choice、non-stream / stream tool_use、chunked tool arguments、multi-tool、text+tool 交织、tool_choice auto/any 矩阵，并有对应 TS integration tests 与 CI smoke。
 - Phase 1 第一批最小 contract 已落地：API key endpoint rule 扩展为 `openai_chat_completions` / `anthropic_messages` / `gemini_contents`，portal `/me` 改为稳定 `overview(apiKey + usage)` contract，request 写入时会回填 `api_keys.last_used_at`，shared schema 已补 Gemini contents request/response 最小 shape。
+- Gemini 最小 non-stream 入口已进入主链路：worker 新增 `/v1beta/models/:model:generateContent`，当前通过 OpenAI-compatible 上游做最小请求/响应翻译，不支持 stream；并新增 `tests/integration/gemini-nonstream.ts` 作为第一条 Gemini happy-path 集成验证。
 - admin-web 与 key-portal 已对齐新 contract：admin API key 发放/审计筛选可识别 `gemini_contents`，portal 可显示 usage/quota 占位字段与 last used time。
 - DB 基线已对齐到新协议枚举：`packages/db/migrations/0001_init.sql` 与新增 `packages/db/migrations/0006_gateway_protocol_contract.sql` 已覆盖 endpoint rule contract 变更。
+- 最新动态验证已通过：受控本地 worker `http://127.0.0.1:8798` 下，`bun --cwd /data/workspace/uhub test:integration:gemini:nonstream` 返回 `status=ok`，响应 `text=Hello`、`finishReason=STOP`、`usageMetadata={promptTokenCount:33,candidatesTokenCount:2,totalTokenCount:35}`。
 - 全仓质量门已通过：`bun --cwd /data/workspace/uhub check` 成功。
-- 参考 AxonHub 后确认：下一阶段真正缺口不是继续深挖 Anthropic，而是 Gemini 真实入口仍缺位、portal quota 仍是 null contract、admin 的上游/模型配置仍偏薄、测试体系仍偏 Anthropic smoke。
+- 参考 AxonHub 后确认：下一阶段真正缺口不是继续深挖 Anthropic，而是 Gemini stream/更完整 contract 仍缺位、portal quota 仍是 null contract、admin 的上游/模型配置仍偏薄、测试体系仍偏 Anthropic smoke。
 - 当前建议执行顺序已更新为：Phase 1 冻结 openai/anthropic/gemini 三协议最小抽象与 canonical usage contract；Phase 2 重组 integration/e2e/CI；Phase 3 落 Gemini 最小协议入口；Phase 4 补 portal 份额/使用情况与 admin 结构化模型配置；Phase 5 升级 CI 为三协议 contract matrix + 最小 e2e。
 - 已新增 OMC 计划文件：`/data/workspace/uhub/.omc/plans/2026-04-18-axonhub-gap-alignment-plan.md`。
-- 当前待做：如果继续执行，应在已冻结的 contract 上进入 Phase 1 下一步，优先补 Gemini 真实 gateway 入口与三协议测试收口，而不是继续无限补 Anthropic 细碎兼容。
+- 当前待做：如果继续执行，应优先转入测试体系重组，把 Gemini 纳入 contract tests / CI，再补 portal quota 真实语义与 admin 结构化模型配置。

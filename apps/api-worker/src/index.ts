@@ -8,6 +8,7 @@ import { ApiKeyConcurrencyDurableObject } from './durable-objects/api-key-concur
 import { appRouter } from './routers';
 import { anthropicMessagesRouter } from './routers/gateway/anthropic-messages';
 import { chatCompletionsRouter } from './routers/gateway/chat-completions';
+import { geminiContentsRouter } from './routers/gateway/gemini-contents';
 import { portalAuthRouter } from './routers/portal/auth';
 import { portalMeRouter } from './routers/portal/me';
 import { portalRequestsRouter } from './routers/portal/requests';
@@ -68,6 +69,7 @@ app.route('/portal', portalMeRouter);
 app.route('/portal', portalRequestsRouter);
 app.route('/v1', chatCompletionsRouter);
 app.route('/anthropic', anthropicMessagesRouter);
+app.route('/v1beta', geminiContentsRouter);
 
 app.all('/trpc/*', async (c) => {
   return fetchRequestHandler({
