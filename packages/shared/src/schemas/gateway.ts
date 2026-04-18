@@ -155,6 +155,52 @@ export const gatewayFailureClassSchema = z.enum([
   'network_error',
 ]);
 
+export const geminiTextPartSchema = z.object({
+  text: z.string().min(1),
+});
+
+export const geminiContentRoleSchema = z.enum(['user', 'model']);
+
+export const geminiContentSchema = z.object({
+  role: geminiContentRoleSchema,
+  parts: z.array(geminiTextPartSchema).min(1),
+});
+
+export const geminiGenerationConfigSchema = z.object({
+  temperature: z.number().min(0).max(2).optional(),
+  topP: z.number().min(0).max(1).optional(),
+  maxOutputTokens: z.number().int().positive().optional(),
+  stopSequences: z.array(z.string().min(1)).max(4).optional(),
+});
+
+export const geminiContentsRequestSchema = z.object({
+  model: z.string().min(1),
+  contents: z.array(geminiContentSchema).min(1),
+  systemInstruction: z
+    .object({
+      parts: z.array(geminiTextPartSchema).min(1),
+    })
+    .optional(),
+  generationConfig: geminiGenerationConfigSchema.optional(),
+  stream: z.boolean().optional(),
+});
+
+export const geminiCandidateSchema = z.object({
+  content: geminiContentSchema,
+  finishReason: z.string().nullable().optional(),
+});
+
+export const geminiUsageMetadataSchema = z.object({
+  promptTokenCount: z.number().int().nonnegative().nullable().optional(),
+  candidatesTokenCount: z.number().int().nonnegative().nullable().optional(),
+  totalTokenCount: z.number().int().nonnegative().nullable().optional(),
+});
+
+export const geminiContentsResponseSchema = z.object({
+  candidates: z.array(geminiCandidateSchema),
+  usageMetadata: geminiUsageMetadataSchema.optional(),
+});
+
 export const gatewayErrorSchema = z.object({
   error: z.object({
     type: gatewayFailureClassSchema,
@@ -248,6 +294,9 @@ export type ChatMessage = z.infer<typeof chatMessageSchema>;
 export type ChatCompletionsRequest = z.infer<typeof chatCompletionsRequestSchema>;
 export type AnthropicMessage = z.infer<typeof anthropicMessageSchema>;
 export type AnthropicMessagesRequest = z.infer<typeof anthropicMessagesRequestSchema>;
+export type GeminiContent = z.infer<typeof geminiContentSchema>;
+export type GeminiContentsRequest = z.infer<typeof geminiContentsRequestSchema>;
+export type GeminiContentsResponse = z.infer<typeof geminiContentsResponseSchema>;
 export type GatewayRequestStatus = z.infer<typeof gatewayRequestStatusSchema>;
 export type GatewayFailureClass = z.infer<typeof gatewayFailureClassSchema>;
 export type RequestHistoryItem = z.infer<typeof requestHistoryItemSchema>;

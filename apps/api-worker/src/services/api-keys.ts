@@ -1,7 +1,19 @@
 import { TRPCError } from '@trpc/server';
-import { asc, desc, eq, inArray } from 'drizzle-orm';
-import type { ApiKey, CreateApiKeyInput, CreateApiKeyResult } from '@uhub/shared';
-import { apiKeyChannelRules, apiKeyEndpointRules, apiKeys, channels, getDb } from '../db/schema';
+import { asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import type {
+  ApiKey,
+  ApiKeyUsageSummary,
+  CreateApiKeyInput,
+  CreateApiKeyResult,
+} from '@uhub/shared';
+import {
+  apiKeyChannelRules,
+  apiKeyEndpointRules,
+  apiKeys,
+  channels,
+  getDb,
+  requests,
+} from '../db/schema';
 import type { WorkerEnv } from '../index';
 
 type ApiKeyLookup = {
@@ -105,6 +117,48 @@ async function assertActiveChannels(env: WorkerEnv, channelIds: string[]) {
   }
 
   return uniqueChannelIds;
+}
+
+export async function getApiKeyUsageSummary(
+  env: WorkerEnv,
+  apiKeyId: string
+): Promise<ApiKeyUsageSummary> {
+  const db = getDb(env);
+  const [overview] = await db
+    .select({
+      totalRequests: sql<number>`count(*)`.mapWith(Number),
+      successRequests:
+        sql<number>`coalesce(sum(case when ${requests.status} = 'completed' then 1 else 0 end), 0)`.mapWith(
+          Number
+        ),
+      failedRequests:
+        sql<number>`coalesce(sum(case when ${requests.status} = 'failed' then 1 else 0 end), 0)`.mapWith(
+          Number
+        ),
+      rejectedRequests:
+        sql<number>`coalesce(sum(case when ${requests.status} = 'rejected' then 1 else 0 end), 0)`.mapWith(
+          Number
+        ),
+      lastUsedAt: sql<number | null>`max(${requests.createdAt})`,
+    })
+    .from(requests)
+    .where(eq(requests.apiKeyId, apiKeyId));
+
+  const lastUsedAt = overview && overview.lastUsedAt !== null ? Number(overview.lastUsedAt) : null;
+
+  return {
+    totalRequests: overview?.totalRequests ?? 0,
+    successRequests: overview?.successRequests ?? 0,
+    failedRequests: overview?.failedRequests ?? 0,
+    rejectedRequests: overview?.rejectedRequests ?? 0,
+    inputTokens: null,
+    outputTokens: null,
+    totalTokens: null,
+    lastUsedAt,
+    quotaLimit: null,
+    quotaUsed: null,
+    quotaRemaining: null,
+  };
 }
 
 export async function listApiKeys(env: WorkerEnv): Promise<ApiKey[]> {

@@ -84,7 +84,7 @@ CREATE TABLE api_key_channel_rules (
 
 CREATE TABLE api_key_endpoint_rules (
   api_key_id TEXT NOT NULL,
-  endpoint TEXT NOT NULL,
+  endpoint TEXT NOT NULL CHECK(endpoint IN ('openai_chat_completions', 'anthropic_messages', 'gemini_contents')),
   PRIMARY KEY (api_key_id, endpoint)
 );
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import type { ApiKey, PortalExchangeResult, RequestHistoryItem } from '@uhub/shared';
+import type { PortalExchangeResult, PortalOverview, RequestHistoryItem } from '@uhub/shared';
 
 const API_BASE_URL = 'http://localhost:8787';
 
@@ -8,10 +8,18 @@ type ErrorPayload = {
   error?: string;
 };
 
+function formatNullableTimestamp(value: number | null) {
+  return typeof value === 'number' ? new Date(value).toISOString() : 'n/a';
+}
+
+function formatNullableMetric(value: number | null) {
+  return value === null ? 'n/a' : value;
+}
+
 function App() {
   const [rawKey, setRawKey] = React.useState('');
   const [session, setSession] = React.useState<PortalExchangeResult | null>(null);
-  const [overview, setOverview] = React.useState<ApiKey | null>(null);
+  const [overview, setOverview] = React.useState<PortalOverview | null>(null);
   const [requests, setRequests] = React.useState<RequestHistoryItem[]>([]);
   const [error, setError] = React.useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -40,7 +48,7 @@ function App() {
         return;
       }
 
-      setOverview((await overviewResponse.json()) as ApiKey);
+      setOverview((await overviewResponse.json()) as PortalOverview);
       setRequests((await requestsResponse.json()) as RequestHistoryItem[]);
     } finally {
       setIsLoadingPortal(false);
@@ -107,15 +115,34 @@ function App() {
             </p>
             {isLoadingPortal ? <p>Loading portal data...</p> : null}
             {overview ? (
-              <ul>
-                <li>Status: {overview.status}</li>
-                <li>
-                  Expires at:{' '}
-                  {overview.expiresAt ? new Date(overview.expiresAt).toISOString() : 'never'}
-                </li>
-                <li>Max concurrency: {overview.maxConcurrency}</li>
-                <li>Allowed endpoints: {overview.endpointRules.join(', ')}</li>
-              </ul>
+              <>
+                <ul>
+                  <li>Status: {overview.apiKey.status}</li>
+                  <li>
+                    Expires at:{' '}
+                    {overview.apiKey.expiresAt
+                      ? new Date(overview.apiKey.expiresAt).toISOString()
+                      : 'never'}
+                  </li>
+                  <li>Max concurrency: {overview.apiKey.maxConcurrency}</li>
+                  <li>Allowed endpoints: {overview.apiKey.endpointRules.join(', ')}</li>
+                </ul>
+
+                <h3>Usage</h3>
+                <ul>
+                  <li>Total requests: {overview.usage.totalRequests}</li>
+                  <li>Success: {overview.usage.successRequests}</li>
+                  <li>Failed: {overview.usage.failedRequests}</li>
+                  <li>Rejected: {overview.usage.rejectedRequests}</li>
+                  <li>Input tokens: {formatNullableMetric(overview.usage.inputTokens)}</li>
+                  <li>Output tokens: {formatNullableMetric(overview.usage.outputTokens)}</li>
+                  <li>Total tokens: {formatNullableMetric(overview.usage.totalTokens)}</li>
+                  <li>Last used at: {formatNullableTimestamp(overview.usage.lastUsedAt)}</li>
+                  <li>Quota limit: {formatNullableMetric(overview.usage.quotaLimit)}</li>
+                  <li>Quota used: {formatNullableMetric(overview.usage.quotaUsed)}</li>
+                  <li>Quota remaining: {formatNullableMetric(overview.usage.quotaRemaining)}</li>
+                </ul>
+              </>
             ) : null}
           </section>
           <section>

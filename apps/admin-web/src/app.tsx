@@ -61,6 +61,7 @@ const initialApiKeyForm: CreateApiKeyInput = {
 const endpointOptions: CreateApiKeyInput['endpointRules'] = [
   'openai_chat_completions',
   'anthropic_messages',
+  'gemini_contents',
 ];
 
 function parseExpiresAtInput(value: string) {
@@ -268,6 +269,7 @@ function AuditSection({
           <option value="">All</option>
           <option value="openai_chat_completions">openai_chat_completions</option>
           <option value="anthropic_messages">anthropic_messages</option>
+          <option value="gemini_contents">gemini_contents</option>
         </select>
       </div>
       <div>
@@ -355,7 +357,10 @@ function ChannelsPage() {
           ? (auditFilters.status as 'pending' | 'processing' | 'completed' | 'failed' | 'rejected')
           : undefined,
         endpoint: auditFilters.endpoint
-          ? (auditFilters.endpoint as 'openai_chat_completions' | 'anthropic_messages')
+          ? (auditFilters.endpoint as
+              | 'openai_chat_completions'
+              | 'anthropic_messages'
+              | 'gemini_contents')
           : undefined,
         apiKeyPrefix: auditFilters.apiKeyPrefix || undefined,
         traceId: auditFilters.traceId || undefined,

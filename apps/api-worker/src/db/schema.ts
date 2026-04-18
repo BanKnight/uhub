@@ -94,7 +94,7 @@ export const apiKeyEndpointRules = sqliteTable(
   {
     apiKeyId: text('api_key_id').notNull(),
     endpoint: text('endpoint', {
-      enum: ['openai_chat_completions', 'anthropic_messages'],
+      enum: ['openai_chat_completions', 'anthropic_messages', 'gemini_contents'],
     }).notNull(),
   },
   (table) => [primaryKey({ columns: [table.apiKeyId, table.endpoint] })]

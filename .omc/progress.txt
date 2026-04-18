@@ -185,13 +185,14 @@
 - admin tRPC 若要依赖 cookie session，前端 tRPC link 必须显式带 `credentials: 'include'`，后端 `/trpc/*` 也必须返回带 credentials 的 CORS
 
 ## Current status
-- v2 Milestone 3 已完成最小 health-aware routing：gateway 现可在同一个 API key 允许多个 channel 时按优先级尝试，并对 upstream 5xx / timeout / network error 做最小跨 channel failover
-- 最新验证已通过：`apps/api-worker`、`packages/shared`、`apps/admin-web` 的 TypeScript 静态检查通过；并在 `http://127.0.0.1:8791` worker + `5005/5006` 双 mock upstream 上完成 failover 动态验证
-- 动态验证结果：第一次请求 `trace-failover-first` 先命中 primary 503，再自动切到 secondary 返回 `200 served-by-secondary-1`；第二次请求 `trace-failover-second` 直接命中 secondary 返回 `200 served-by-secondary-2`；计数显示 `primaryHits=1`、`secondaryHits=2`，证明失败 channel 已被短期冷却跳过
-- Anthropic protocol 兼容层已进一步补齐：`/anthropic/v1/messages` 现支持 `max_tokens`、`top_p`、`stop_sequences`、`metadata` 等常用字段；non-stream/stream 响应都包含 `usage`，命中 stop sequence 时会返回 `stop_reason=stop_sequence` 与对应 `stop_sequence`
-- 最新 Anthropic 协议验证结果：`trace-anthropic-protocol-nonstream-2` 返回 `text=Hello`、`stop_reason=stop_sequence`、`stop_sequence=<STOP>`、`usage={input_tokens:59,output_tokens:2}`；`trace-anthropic-protocol-stream-2` 返回 `text/event-stream`，`text_deltas=[Hello]`、`stop_reason=stop_sequence`、`stop_sequence=<STOP>`、`usage={input_tokens:63,output_tokens:2}`
-- block 输入兼容已补齐：`system` 现支持 text blocks 数组，`messages[].content` 支持 `tool_result` block；动态验证 `trace-anthropic-block-compat` 返回 `200`，证明 system blocks 与 tool_result blocks 已可被规整到当前最小转发链路
-- non-stream tool use 输出已补齐：当上游返回 `tool_calls` 时，Claude 响应会翻译为 `content=[{type:tool_use,...}]`，并返回 `stop_reason=tool_use`；动态验证 `trace-anthropic-tool-use-nonstream-3` 返回 `200`，`tool_use={id:toolu_mock_123,name:get_weather,input:{city:Shanghai,unit:celsius}}`
-- stream tool use 输出已补齐：当上游 streaming chunk 返回 `tool_calls` 时，Claude SSE 现会输出 `content_block_start(type=tool_use)`、`content_block_delta(type=input_json_delta)`、`content_block_stop`、`message_delta(stop_reason=tool_use)`、`message_stop`；动态验证 `trace-anthropic-tool-use-stream-events` 返回 `200 text/event-stream`
-- stream tool_call 分片兼容已补齐：当同一个 `tool_call` 的 arguments 被拆成多个 chunk 时，Claude SSE 会在同一个 `tool_use` block index 下连续输出多个 `input_json_delta`；动态验证 `trace-anthropic-tool-use-stream-chunked` 返回 `200 text/event-stream`，事件序列包含单个 `content_block_start(index=0)`、两个连续 `content_block_delta(index=0)`、`content_block_stop(index=0)` 与 `message_delta(stop_reason=tool_use)`
-- 当前待做：如要继续 v2，下一个自然阶段是补更完整 Anthropic stream 多 tool blocks / tool_result / text+tool 交织覆盖、更多 message content block types，或进一步持久化 health / scoring / retry policy
+- 当前方向已重新锚定 `/data/repos/axonhub`：后续不再由 uhub 局部技术延伸驱动，而是先做 AxonHub 对照差距，再决定优先级。
+- 个人版 AxonHub 的 MVP 主链路基本已成立：admin 登录、channel 管理、API key create/revoke/rotate、portal exchange/overview/history、`/v1/chat/completions`、基础 analytics/audit、concurrency 429、failover 最小能力都已存在。
+- Anthropic 兼容层现已覆盖：non-stream / stream text、stop_sequence / usage、system text blocks、tool_result 输入规整、request-side tools / tool_choice、non-stream / stream tool_use、chunked tool arguments、multi-tool、text+tool 交织、tool_choice auto/any 矩阵，并有对应 TS integration tests 与 CI smoke。
+- Phase 1 第一批最小 contract 已落地：API key endpoint rule 扩展为 `openai_chat_completions` / `anthropic_messages` / `gemini_contents`，portal `/me` 改为稳定 `overview(apiKey + usage)` contract，request 写入时会回填 `api_keys.last_used_at`，shared schema 已补 Gemini contents request/response 最小 shape。
+- admin-web 与 key-portal 已对齐新 contract：admin API key 发放/审计筛选可识别 `gemini_contents`，portal 可显示 usage/quota 占位字段与 last used time。
+- DB 基线已对齐到新协议枚举：`packages/db/migrations/0001_init.sql` 与新增 `packages/db/migrations/0006_gateway_protocol_contract.sql` 已覆盖 endpoint rule contract 变更。
+- 全仓质量门已通过：`bun --cwd /data/workspace/uhub check` 成功。
+- 参考 AxonHub 后确认：下一阶段真正缺口不是继续深挖 Anthropic，而是 Gemini 真实入口仍缺位、portal quota 仍是 null contract、admin 的上游/模型配置仍偏薄、测试体系仍偏 Anthropic smoke。
+- 当前建议执行顺序已更新为：Phase 1 冻结 openai/anthropic/gemini 三协议最小抽象与 canonical usage contract；Phase 2 重组 integration/e2e/CI；Phase 3 落 Gemini 最小协议入口；Phase 4 补 portal 份额/使用情况与 admin 结构化模型配置；Phase 5 升级 CI 为三协议 contract matrix + 最小 e2e。
+- 已新增 OMC 计划文件：`/data/workspace/uhub/.omc/plans/2026-04-18-axonhub-gap-alignment-plan.md`。
+- 当前待做：如果继续执行，应在已冻结的 contract 上进入 Phase 1 下一步，优先补 Gemini 真实 gateway 入口与三协议测试收口，而不是继续无限补 Anthropic 细碎兼容。

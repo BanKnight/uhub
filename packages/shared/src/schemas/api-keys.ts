@@ -1,7 +1,28 @@
 import { z } from 'zod';
 
 export const apiKeyStatusSchema = z.enum(['active', 'disabled', 'expired', 'revoked']);
-export const endpointRuleSchema = z.enum(['openai_chat_completions', 'anthropic_messages']);
+export const endpointRuleSchema = z.enum([
+  'openai_chat_completions',
+  'anthropic_messages',
+  'gemini_contents',
+]);
+
+const usageCountSchema = z.number().int().nonnegative();
+const nullableUsageMetricSchema = z.number().nullable();
+
+export const apiKeyUsageSummarySchema = z.object({
+  totalRequests: usageCountSchema,
+  successRequests: usageCountSchema,
+  failedRequests: usageCountSchema,
+  rejectedRequests: usageCountSchema,
+  inputTokens: nullableUsageMetricSchema,
+  outputTokens: nullableUsageMetricSchema,
+  totalTokens: nullableUsageMetricSchema,
+  lastUsedAt: z.number().nullable(),
+  quotaLimit: nullableUsageMetricSchema,
+  quotaUsed: nullableUsageMetricSchema,
+  quotaRemaining: nullableUsageMetricSchema,
+});
 
 export const apiKeySchema = z.object({
   id: z.string(),
@@ -16,6 +37,11 @@ export const apiKeySchema = z.object({
   updatedAt: z.number(),
   channelIds: z.array(z.string()),
   endpointRules: z.array(endpointRuleSchema),
+});
+
+export const portalOverviewSchema = z.object({
+  apiKey: apiKeySchema,
+  usage: apiKeyUsageSummarySchema,
 });
 
 export const createApiKeyInputSchema = z.object({
@@ -50,7 +76,9 @@ export const portalExchangeResultSchema = z.object({
   expiresAt: z.number(),
 });
 
+export type ApiKeyUsageSummary = z.infer<typeof apiKeyUsageSummarySchema>;
 export type ApiKey = z.infer<typeof apiKeySchema>;
+export type PortalOverview = z.infer<typeof portalOverviewSchema>;
 export type CreateApiKeyInput = z.infer<typeof createApiKeyInputSchema>;
 export type CreateApiKeyResult = z.infer<typeof createApiKeyResultSchema>;
 export type RevokeApiKeyInput = z.infer<typeof revokeApiKeyInputSchema>;

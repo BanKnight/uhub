@@ -53,6 +53,13 @@ export async function createRequestRecord(env: WorkerEnv, input: CreateRequestRe
     createdAt: now,
   });
 
+  await db
+    .update(apiKeys)
+    .set({
+      lastUsedAt: now,
+    })
+    .where(eq(apiKeys.id, input.apiKeyId));
+
   return { id, startedAt: now };
 }
 
