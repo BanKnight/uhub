@@ -21,6 +21,11 @@
     "prepare": "husky",
     "db:generate": "bun --cwd apps/api-worker drizzle-kit generate",
     "db:migrate:local": "bun x wrangler d1 migrations apply DB --local --cwd apps/api-worker",
+    "test:integration": "bun run test:integration:ci",
+    "test:integration:ci": "bun run test:integration:openai && bun run test:integration:anthropic && bun run test:integration:gemini",
+    "test:integration:openai": "bun run test:integration:openai:nonstream",
+    "test:integration:openai:nonstream": "bun tests/integration/openai-nonstream.ts",
+    "test:integration:anthropic": "bun run test:integration:anthropic:nonstream && bun run test:integration:anthropic:stream-text && bun run test:integration:anthropic:tool-use-stream && bun run test:integration:anthropic:tool-choice-auto-any && bun run test:integration:anthropic:tool-use-multi-nonstream && bun run test:integration:anthropic:tool-use-multi-stream && bun run test:integration:anthropic:tool-use-nonstream && bun run test:integration:anthropic:invalid-request && bun run test:integration:anthropic:gateway-failover && bun run test:integration:anthropic:tools-request",
     "test:integration:anthropic:nonstream": "bun tests/integration/anthropic-nonstream.ts",
     "test:integration:anthropic:stream-text": "bun tests/integration/anthropic-stream-text.ts",
     "test:integration:anthropic:tool-use-stream": "bun tests/integration/anthropic-tool-use-stream.ts",
@@ -31,6 +36,7 @@
     "test:integration:anthropic:invalid-request": "bun tests/integration/anthropic-invalid-request.ts",
     "test:integration:anthropic:gateway-failover": "bun tests/integration/anthropic-gateway-failover.ts",
     "test:integration:anthropic:tools-request": "bun tests/integration/anthropic-tools-request.ts",
+    "test:integration:gemini": "bun run test:integration:gemini:nonstream",
     "test:integration:gemini:nonstream": "bun tests/integration/gemini-nonstream.ts"
   },
   "lint-staged": {
