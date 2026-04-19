@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { endpointRuleSchema } from './api-keys';
+import { endpointRuleSchema, requestTokenUsageAvailabilitySchema } from './api-keys';
 
 export const gatewayEndpointSchema = endpointRuleSchema;
 
@@ -222,6 +222,10 @@ export const requestHistoryItemSchema = z.object({
   latencyMs: z.number().int().nullable(),
   requestSize: z.number().int().nullable(),
   responseSize: z.number().int().nullable(),
+  inputTokens: z.number().int().nonnegative().nullable(),
+  outputTokens: z.number().int().nonnegative().nullable(),
+  totalTokens: z.number().int().nonnegative().nullable(),
+  tokenUsageAvailability: requestTokenUsageAvailabilitySchema,
   startedAt: z.number().int(),
   finishedAt: z.number().int().nullable(),
   createdAt: z.number().int(),
@@ -248,12 +252,19 @@ export const chatCompletionChoiceSchema = z.object({
   finish_reason: z.string().nullable().optional(),
 });
 
+export const chatCompletionUsageSchema = z.object({
+  prompt_tokens: z.number().int().nonnegative(),
+  completion_tokens: z.number().int().nonnegative(),
+  total_tokens: z.number().int().nonnegative(),
+});
+
 export const chatCompletionsResponseSchema = z.object({
   id: z.string(),
   object: z.literal('chat.completion'),
   created: z.number().int(),
   model: z.string(),
   choices: z.array(chatCompletionChoiceSchema),
+  usage: chatCompletionUsageSchema.optional(),
 });
 
 export const anthropicTextBlockSchema = z.object({
@@ -274,8 +285,8 @@ export const anthropicResponseContentBlockSchema = z.union([
 ]);
 
 export const anthropicUsageSchema = z.object({
-  input_tokens: z.number().int().nonnegative(),
-  output_tokens: z.number().int().nonnegative(),
+  input_tokens: z.number().int().nonnegative().nullable(),
+  output_tokens: z.number().int().nonnegative().nullable(),
 });
 
 export const anthropicMessagesResponseSchema = z.object({

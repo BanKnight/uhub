@@ -137,6 +137,7 @@ function App() {
                   <li>Input tokens: {formatNullableMetric(overview.usage.inputTokens)}</li>
                   <li>Output tokens: {formatNullableMetric(overview.usage.outputTokens)}</li>
                   <li>Total tokens: {formatNullableMetric(overview.usage.totalTokens)}</li>
+                  <li>Token availability: {overview.usage.tokenUsageAvailability}</li>
                   <li>Last used at: {formatNullableTimestamp(overview.usage.lastUsedAt)}</li>
                   <li>Quota limit: {formatNullableMetric(overview.usage.quotaLimit)}</li>
                   <li>Quota used: {formatNullableMetric(overview.usage.quotaUsed)}</li>
@@ -158,6 +159,10 @@ function App() {
                     <div>Trace: {request.traceId ?? 'n/a'}</div>
                     <div>Latency: {request.latencyMs ?? 'n/a'}</div>
                     <div>HTTP: {request.httpStatus ?? 'n/a'}</div>
+                    <div>Input tokens: {formatNullableMetric(request.inputTokens)}</div>
+                    <div>Output tokens: {formatNullableMetric(request.outputTokens)}</div>
+                    <div>Total tokens: {formatNullableMetric(request.totalTokens)}</div>
+                    <div>Token availability: {request.tokenUsageAvailability}</div>
                     <div>Created: {new Date(request.createdAt).toISOString()}</div>
                   </li>
                 ))}

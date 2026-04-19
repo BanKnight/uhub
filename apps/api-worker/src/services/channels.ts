@@ -56,7 +56,7 @@ export async function createChannel(
     baseUrl: input.baseUrl,
     modelsJson: JSON.stringify(input.models),
     status: input.status,
-    configJson: input.configJson,
+    configJson: '{}',
     createdAt: now,
     updatedAt: now,
   });
@@ -70,6 +70,11 @@ export async function updateChannel(
   input: UpdateChannelInput
 ): Promise<Channel | undefined> {
   const db = getDb(env);
+  const existingRow = await db.select().from(channels).where(eq(channels.id, input.id)).get();
+
+  if (!existingRow) {
+    return undefined;
+  }
 
   await db
     .update(channels)
@@ -80,7 +85,7 @@ export async function updateChannel(
       baseUrl: input.baseUrl,
       modelsJson: JSON.stringify(input.models),
       status: input.status,
-      configJson: input.configJson,
+      configJson: existingRow.configJson,
       updatedAt: Date.now(),
     })
     .where(eq(channels.id, input.id));

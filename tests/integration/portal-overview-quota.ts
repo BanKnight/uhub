@@ -65,6 +65,11 @@ async function main() {
             finish_reason: 'stop',
           },
         ],
+        usage: {
+          prompt_tokens: 9,
+          completion_tokens: 4,
+          total_tokens: 13,
+        },
       }),
       headers: {
         'content-type': 'application/json',
@@ -114,6 +119,22 @@ async function main() {
       assert(
         overview.json?.usage?.quotaRemaining === 0,
         `Unexpected quotaRemaining: ${JSON.stringify(overview.json)}`
+      );
+      assert(
+        overview.json?.usage?.inputTokens === 9,
+        `Unexpected inputTokens: ${JSON.stringify(overview.json)}`
+      );
+      assert(
+        overview.json?.usage?.outputTokens === 4,
+        `Unexpected outputTokens: ${JSON.stringify(overview.json)}`
+      );
+      assert(
+        overview.json?.usage?.totalTokens === 13,
+        `Unexpected totalTokens: ${JSON.stringify(overview.json)}`
+      );
+      assert(
+        overview.json?.usage?.tokenUsageAvailability === 'available',
+        `Unexpected tokenUsageAvailability: ${JSON.stringify(overview.json)}`
       );
 
       console.log(

@@ -18,6 +18,8 @@ export type WorkerEnv = {
   API_KEY_CONCURRENCY: DurableObjectNamespace;
   ADMIN_EMAIL?: string;
   ADMIN_PASSWORD?: string;
+  GATEWAY_TIMEOUT_MS?: string;
+  GATEWAY_CHANNEL_UNHEALTHY_COOLDOWN_MS?: string;
 };
 
 const app = new Hono<{ Bindings: WorkerEnv }>();

@@ -131,6 +131,12 @@ export const requests = sqliteTable('requests', {
   latencyMs: integer('latency_ms'),
   requestSize: integer('request_size'),
   responseSize: integer('response_size'),
+  inputTokens: integer('input_tokens'),
+  outputTokens: integer('output_tokens'),
+  totalTokens: integer('total_tokens'),
+  tokenUsageAvailability: text('token_usage_availability', {
+    enum: ['available', 'unavailable'],
+  }).notNull(),
   payloadRef: text('payload_ref'),
   startedAt: integer('started_at').notNull(),
   finishedAt: integer('finished_at'),

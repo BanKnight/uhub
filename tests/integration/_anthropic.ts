@@ -75,30 +75,43 @@ export async function ensureAdminSession() {
   return signIn.cookie;
 }
 
+function resolveProvider(
+  protocol: 'openai_chat_completions' | 'anthropic_messages' | 'gemini_contents'
+) {
+  if (protocol === 'anthropic_messages') {
+    return 'anthropic';
+  }
+
+  if (protocol === 'gemini_contents') {
+    return 'gemini';
+  }
+
+  return 'openai';
+}
+
 export async function createChannel(
   cookie: string,
   input: {
     name: string;
     baseUrl: string;
-    provider?: string;
+    provider?: 'openai' | 'anthropic' | 'gemini';
     protocol?: 'openai_chat_completions' | 'anthropic_messages' | 'gemini_contents';
     models?: string[];
     status?: 'active' | 'disabled';
-    configJson?: string;
   }
 ) {
+  const protocol = input.protocol ?? 'openai_chat_completions';
   const result = await requestJson(
     '/trpc/admin.channels.create',
     {
       method: 'POST',
       body: JSON.stringify({
         name: input.name,
-        provider: input.provider ?? 'openai-compatible',
-        protocol: input.protocol ?? 'openai_chat_completions',
+        provider: input.provider ?? resolveProvider(protocol),
+        protocol,
         baseUrl: input.baseUrl,
         models: input.models ?? [],
         status: input.status ?? 'active',
-        configJson: input.configJson ?? '{}',
       }),
     },
     cookie
@@ -139,6 +152,98 @@ export async function createApiKey(
   assert(result.response.ok, `Create API key failed: ${JSON.stringify(result.json)}`);
   assert(result.json?.result?.data?.rawKey, 'API key response missing rawKey');
   return result.json.result.data.rawKey as string;
+}
+
+export async function listChannels(cookie: string) {
+  const result = await requestJson('/trpc/admin.channels.list', { method: 'GET' }, cookie);
+
+  assert(result.response.ok, `List channels failed: ${JSON.stringify(result.json)}`);
+  return (result.json?.result?.data ?? []) as Array<{
+    id: string;
+    name: string;
+    provider: string;
+    protocol: string;
+    baseUrl: string;
+    models: string[];
+    status: string;
+    configJson: string;
+  }>;
+}
+
+export async function updateChannel(
+  cookie: string,
+  input: {
+    id: string;
+    name: string;
+    provider: 'openai' | 'anthropic' | 'gemini';
+    protocol: 'openai_chat_completions' | 'anthropic_messages' | 'gemini_contents';
+    baseUrl: string;
+    models?: string[];
+    status?: 'active' | 'disabled';
+  }
+) {
+  const result = await requestJson(
+    '/trpc/admin.channels.update',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        id: input.id,
+        name: input.name,
+        provider: input.provider,
+        protocol: input.protocol,
+        baseUrl: input.baseUrl,
+        models: input.models ?? [],
+        status: input.status ?? 'active',
+      }),
+    },
+    cookie
+  );
+
+  assert(result.response.ok, `Update channel failed: ${JSON.stringify(result.json)}`);
+  assert(result.json?.result?.data?.id, 'Update channel response missing id');
+  return result.json.result.data as {
+    id: string;
+    name: string;
+    provider: string;
+    protocol: string;
+    baseUrl: string;
+    models: string[];
+    status: string;
+    configJson: string;
+  };
+}
+
+export async function updateChannelStatus(
+  cookie: string,
+  input: {
+    id: string;
+    status: 'active' | 'disabled';
+  }
+) {
+  const result = await requestJson(
+    '/trpc/admin.channels.status',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        id: input.id,
+        status: input.status,
+      }),
+    },
+    cookie
+  );
+
+  assert(result.response.ok, `Update channel status failed: ${JSON.stringify(result.json)}`);
+  assert(result.json?.result?.data?.id, 'Update channel status response missing id');
+  return result.json.result.data as {
+    id: string;
+    name: string;
+    provider: string;
+    protocol: string;
+    baseUrl: string;
+    models: string[];
+    status: string;
+    configJson: string;
+  };
 }
 
 async function withMockUpstream(

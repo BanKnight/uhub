@@ -9,6 +9,8 @@ export const endpointRuleSchema = z.enum([
 
 const usageCountSchema = z.number().int().nonnegative();
 const nullableUsageMetricSchema = z.number().nullable();
+export const requestTokenUsageAvailabilitySchema = z.enum(['available', 'unavailable']);
+export const summaryTokenUsageAvailabilitySchema = z.enum(['available', 'partial', 'unavailable']);
 
 export const apiKeyQuotaSchema = z.object({
   requestLimit: z.number().int().positive().nullable(),
@@ -22,6 +24,7 @@ export const apiKeyUsageSummarySchema = z.object({
   inputTokens: nullableUsageMetricSchema,
   outputTokens: nullableUsageMetricSchema,
   totalTokens: nullableUsageMetricSchema,
+  tokenUsageAvailability: summaryTokenUsageAvailabilitySchema,
   lastUsedAt: z.number().nullable(),
   quotaLimit: nullableUsageMetricSchema,
   quotaUsed: nullableUsageMetricSchema,

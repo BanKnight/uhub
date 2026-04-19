@@ -216,8 +216,11 @@ async function main() {
         `Unexpected stop_reason: ${JSON.stringify(messageDelta)}`
       );
       assert(
-        typeof messageDelta?.data?.usage?.output_tokens === 'number' &&
-          messageDelta.data.usage.output_tokens > 0,
+        messageDelta?.data?.usage?.input_tokens === null,
+        `Unexpected usage payload: ${JSON.stringify(messageDelta)}`
+      );
+      assert(
+        messageDelta?.data?.usage?.output_tokens === null,
         `Unexpected usage payload: ${JSON.stringify(messageDelta)}`
       );
 

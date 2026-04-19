@@ -1,490 +1,76 @@
 {
   "stories": [
     {
-      "id": "M0-US1",
-      "title": "建立 bun monorepo 根配置",
+      "id": "R1-US1",
+      "title": "实现 Gemini stream 主链路生命周期闭环",
       "priority": 1,
       "passes": true,
       "acceptanceCriteria": [
-        "根目录存在 package.json，且声明 workspace 覆盖 apps/* 与 packages/*",
-        "根目录存在 bunfig.toml、tsconfig.json、biome.json",
-        "根目录脚本至少包含 dev/build/typecheck/lint 的占位或实际命令",
-        "配置保持 YAGNI，不引入与 MVP 无关的库或工具"
+        "`apps/api-worker/src/routers/gateway/gemini-contents.ts` 支持 Gemini stream 请求主链路，不再直接拒绝 stream=true 的最小 happy path",
+        "Gemini stream 在完成、读流中断或超时场景下都能把 request status 正确收敛，且不会留下悬挂 lease",
+        "Gemini stream 相关 request/channel 处理覆盖 channel health 恢复或失败标记，不破坏现有 OpenAI/Anthropic 路径",
+        "Phase 1 明确禁止伪 token 持久化：Gemini stream 缺失 usage 时只允许写入 null/unavailable，不允许写入估算 token、responseSize 或前端推导值"
       ]
     },
     {
-      "id": "M0-US2",
-      "title": "建立三应用与共享包目录骨架",
+      "id": "R1-US2",
+      "title": "补齐 Gemini stream 集成验证并通过 Phase 1 质量门",
       "priority": 2,
       "passes": true,
       "acceptanceCriteria": [
-        "存在 apps/admin-web、apps/key-portal、apps/api-worker、packages/shared、packages/db、packages/config、packages/ui 目录",
-        "admin-web 与 key-portal 各自存在最小 package.json、tsconfig、vite 入口文件",
-        "api-worker 存在最小 package.json、src/index.ts、wrangler.jsonc",
-        "目录结构与实施计划中的 Milestone 0 保持一致，没有夹带业务逻辑"
+        "存在覆盖 Gemini stream happy path 与生命周期闭环的 integration 测试，且命令入口收口到 bun run test:integration:gemini 或更细分的 Gemini stream 入口",
+        "`bun run test:integration:gemini` 通过，且包含新的 Gemini stream 覆盖",
+        "`bun run test:e2e:core` 通过，证明 Phase 1 没有破坏现有 portal/admin 主链路",
+        "`bun run check` 通过，且没有新增类型、lint、build 回归"
       ]
     },
     {
-      "id": "M0-US3",
-      "title": "让 monorepo 骨架通过基础验证",
+      "id": "R1-US3",
+      "title": "冻结 token usage 真值的单一持久层与读取契约",
       "priority": 3,
       "passes": true,
       "acceptanceCriteria": [
-        "bun install 可以成功完成",
-        "根目录 typecheck 命令可以成功完成",
-        "根目录 build 命令至少能验证三应用/包的最小配置不报错",
-        "验证输出记录到 progress.txt"
+        "token usage 真值在后端存在单一持久层来源，portal/history/admin 读取同一套契约，而不是各自推导",
+        "non-stream 路径在上游提供 usage 时能持久化真实 input/output/total token 值",
+        "stream 路径在具备最终 usage 时能回填真值；上游缺失 usage 时显式落为 null/unavailable，而不是估算",
+        "契约明确定义 null 与 unavailable 语义，并覆盖旧数据兼容，不要求伪补历史 token"
       ]
     },
     {
-      "id": "M1-US1",
-      "title": "为 API Worker 接入 Better Auth 最小依赖与 auth 入口",
+      "id": "R1-US4",
+      "title": "完成 token usage 真值的产品面验证收口",
       "priority": 4,
       "passes": true,
       "acceptanceCriteria": [
-        "apps/api-worker/package.json 增加 Better Auth 与实现 admin email/password 所需最小依赖",
-        "apps/api-worker/src/auth/better-auth.ts 存在，并导出最小 Better Auth 实例",
-        "apps/api-worker/src/index.ts 接入 auth 路由占位，不影响 /healthz",
-        "实现保持单 admin auth 场景，不引入 OAuth、组织、多租户或额外插件"
+        "portal overview、request history、admin analytics 或等价读取面，对 token usage 的展示口径与后端契约一致",
+        "quota 与 token usage 语义分离，不会把 requestLimit/requestCount 混充 token 值",
+        "存在覆盖 non-stream、stream、上游缺失 usage 的 integration 验证，且 `bun run test:integration` 通过",
+        "`bun run test:e2e:core` 与相关 portal usage 验证通过，证明真值收口没有破坏现有主链路"
       ]
     },
     {
-      "id": "M1-US2",
-      "title": "建立首批 D1 schema 与 migration 文件",
+      "id": "R1-US5",
+      "title": "增强 admin 结构化 provider/model/upstream 配置并保留兼容读取",
       "priority": 5,
       "passes": true,
       "acceptanceCriteria": [
-        "packages/db 下存在首批 schema 文件，覆盖 channels、api_keys、api_key_channel_rules、api_key_endpoint_rules、portal_sessions、requests",
-        "packages/db/migrations 下存在初始 migration 文件",
-        "schema 与实施计划中的首批表设计一致，未提前引入业务外字段",
-        "api-worker 的 wrangler 配置补上 D1 绑定占位"
+        "channel/admin 配置以结构化 provider/model/upstream 字段表达，不继续新增自由 `configJson` 写入路径",
+        "现有旧 `configJson` 数据仍可被兼容读取或迁移，不阻断已有 channel 展示与使用",
+        "admin-web 的创建/展示/编辑流程覆盖新的结构化字段，且仍只围绕 openai/anthropic/gemini",
+        "实现保持最小范围，不引入与当前主线无关的 provider 扩展或平台化抽象重做"
       ]
     },
     {
-      "id": "M1-US3",
-      "title": "建立 admin 登录页与最小鉴权壳",
+      "id": "R1-US6",
+      "title": "完成 admin 配置增强回归验证并通过最终质量门",
       "priority": 6,
       "passes": true,
       "acceptanceCriteria": [
-        "apps/admin-web 存在 sign-in 路由页面",
-        "前端有最小 auth client / request helper 占位，可对接 Better Auth",
-        "admin 根入口有最小未登录/已登录壳层，不提前实现 channel 页面业务逻辑",
-        "保持 YAGNI：只为后续 admin auth 打基础，不夹带 portal/gateway 功能"
+        "存在覆盖 admin 结构化配置创建、展示、启停、兼容读取/迁移的验证",
+        "`bun run test:integration` 通过，且包含 admin 配置增强相关覆盖",
+        "`bun run test:e2e:core` 通过，证明 admin 改动未破坏用户主链路",
+        "`bun run check` 通过，准备进入 reviewer verification"
       ]
-    },
-    {
-      "id": "M1-US4",
-      "title": "验证 Milestone 1 最小链路",
-      "priority": 7,
-      "passes": true,
-      "acceptanceCriteria": [
-        "依赖安装后 typecheck/build 仍通过",
-        "api-worker 的 /healthz 仍可工作",
-        "新增 auth/schema 代码没有引入 TypeScript 错误",
-        "验证结果被记录到 progress.txt"
-      ]
-    },
-    {
-      "id": "M2-US1",
-      "title": "为 API Worker 接入最小 tRPC admin 路由层",
-      "priority": 8,
-      "passes": true,
-      "acceptanceCriteria": [
-        "apps/api-worker 增加 tRPC 依赖并建立 app router / context / admin router 最小结构",
-        "Hono Worker 挂载 /trpc 路由，不影响现有 /api/auth/* 与 /healthz",
-        "admin channels 路由至少提供 list/create/update 三个过程",
-        "保持单一 admin 侧使用，不提前实现 portal/gateway tRPC"
-      ]
-    },
-    {
-      "id": "M2-US2",
-      "title": "实现 channels 的 D1 数据访问与最小业务逻辑",
-      "priority": 9,
-      "passes": true,
-      "acceptanceCriteria": [
-        "存在 channels schema 对应的最小查询/插入/更新逻辑",
-        "禁用 channel 后 list 结果能反映状态变化",
-        "create/update 输入使用 zod schema 约束",
-        "不引入 model mapping、探活、批量操作等 Milestone 2 之外能力"
-      ]
-    },
-    {
-      "id": "M2-US3",
-      "title": "建立 admin-web 的 TanStack 路由和 channels 页面",
-      "priority": 10,
-      "passes": true,
-      "acceptanceCriteria": [
-        "admin-web 引入 TanStack Router 和 TanStack Query 的最小壳",
-        "存在 channels 页面路由与最小列表渲染",
-        "页面可以调用 tRPC channels.list 并渲染结果",
-        "保持最小 UI，不提前引入 portal 页面或复杂组件体系"
-      ]
-    },
-    {
-      "id": "M2-US4",
-      "title": "让 admin-web 完成 channels 创建与状态更新最小闭环",
-      "priority": 11,
-      "passes": true,
-      "acceptanceCriteria": [
-        "admin-web 能创建 channel",
-        "admin-web 能修改 channel 基本字段或状态",
-        "前后端成功路径在构建产物与本地最小运行检查中可用",
-        "实现保持 YAGNI，不加入分页/搜索/复杂表格"
-      ]
-    },
-    {
-      "id": "M2-US5",
-      "title": "验证 Milestone 2 最小链路",
-      "priority": 12,
-      "passes": true,
-      "acceptanceCriteria": [
-        "新增依赖后 bun install、typecheck、build 通过",
-        "api-worker 的 /trpc 路由编译通过",
-        "admin-web 的 channels 页面编译通过",
-        "验证结果被记录到 progress.txt"
-      ]
-    },
-    {
-      "id": "M3-US1",
-      "title": "定义 API key 与 portal exchange 的共享 schema",
-      "priority": 13,
-      "passes": true,
-      "acceptanceCriteria": [
-        "packages/shared 新增 api key create/list 与 portal exchange 所需 zod schema",
-        "schema 覆盖 label、channel rules、endpoint rules、maxConcurrency、expiresAt",
-        "只保留单 profile key 模型，不引入 profile 切换或企业字段",
-        "shared index 导出新增 schema 和类型"
-      ]
-    },
-    {
-      "id": "M3-US2",
-      "title": "实现 admin API key 签发最小后端链路",
-      "priority": 14,
-      "passes": true,
-      "acceptanceCriteria": [
-        "api-worker 存在 admin.apiKeys.create 与 list 最小 tRPC 过程",
-        "create 时一次性返回 raw key，数据库只写 prefix 与 hash",
-        "同时写入 api_keys、api_key_channel_rules、api_key_endpoint_rules",
-        "不提前实现 rotate、审计、批量操作"
-      ]
-    },
-    {
-      "id": "M3-US3",
-      "title": "实现 portal exchange 与 portal session 最小后端链路",
-      "priority": 15,
-      "passes": true,
-      "acceptanceCriteria": [
-        "api-worker 存在 /portal/auth/exchange 路由",
-        "raw key 可校验 active/expired/revoked/disabled 状态后换取 portal session",
-        "portal session 只写 portal_sessions，不回存 raw key",
-        "失效 key 无法 exchange"
-      ]
-    },
-    {
-      "id": "M3-US4",
-      "title": "建立 key-portal 的最小登录页与 exchange 提交闭环",
-      "priority": 16,
-      "passes": true,
-      "acceptanceCriteria": [
-        "key-portal 存在 login 页面或根页登录表单",
-        "页面可以提交 raw key 到 exchange 接口",
-        "成功后进入最小已登录壳或成功提示",
-        "保持最小 UI，不提前实现 overview/history 页面"
-      ]
-    },
-    {
-      "id": "M3-US5",
-      "title": "验证 Milestone 3 最小链路",
-      "priority": 17,
-      "passes": true,
-      "acceptanceCriteria": [
-        "新增依赖后 typecheck 与 build 通过",
-        "admin API key create/list 编译并可本地调用",
-        "portal exchange 成功与失败路径至少各验证一条",
-        "验证结果被记录到 progress.txt"
-      ]
-    },
-    {
-      "id": "M4-US1",
-      "title": "定义 gateway 请求共享 schema 与最小 endpoint 常量",
-      "priority": 18,
-      "passes": true,
-      "acceptanceCriteria": [
-        "packages/shared 新增 gateway route endpoint、chat completions 请求/响应与 request history 所需最小 schema 或类型",
-        "shared schema 区分客户端入口 endpoint（如 /v1/chat/completions、后续 /anthropic）与底层模型能力，并覆盖 traceId、request status 等 M4 必需字段",
-        "shared index 导出 gateway 相关 schema/type，且 M4 只实现 /v1/chat/completions，不提前实现 /anthropic、responses/embeddings/models 等扩展",
-        "实现保持 OpenAI-compatible chat completions MVP 边界，同时为后续 Claude Code /anthropic 入口预留命名空间"
-      ]
-    },
-    {
-      "id": "M4-US2",
-      "title": "建立 raw API key 鉴权与 gateway 前置校验",
-      "priority": 19,
-      "passes": true,
-      "acceptanceCriteria": [
-        "apps/api-worker 存在最小 require-api-key 中间件或等价逻辑，可校验 raw key 对应 api_keys 状态",
-        "gateway 路由能校验 endpoint allowlist 与 channel allowlist",
-        "无效、过期、撤销或不允许访问 endpoint 的 key 会被拒绝",
-        "实现不提前引入 Durable Objects 并发控制"
-      ]
-    },
-    {
-      "id": "M4-US3",
-      "title": "实现 /v1/chat/completions 最小网关与 requests 落库",
-      "priority": 20,
-      "passes": true,
-      "acceptanceCriteria": [
-        "apps/api-worker 存在 /v1/chat/completions 路由并接入最小 gateway service",
-        "请求进入后会先写入 requests pending 记录，结束后更新 status/httpStatus/latency/channel/model/size",
-        "trace_id 可从 header 透传，缺失时自动生成并写入 requests",
-        "当前实现只要求最小可编译与可验证链路，不提前实现 provider 广覆盖或流式细节"
-      ]
-    },
-    {
-      "id": "M4-US4",
-      "title": "验证 Milestone 4 最小链路",
-      "priority": 21,
-      "passes": true,
-      "acceptanceCriteria": [
-        "新增 gateway 代码后 typecheck 与 build 通过",
-        "合法 key 可调用 /v1/chat/completions",
-        "不允许 endpoint 的 key 会被拒绝且 requests 历史符合最小预期",
-        "验证结果被记录到 progress.txt"
-      ]
-    },
-    {
-      "id": "M5-US1",
-      "title": "建立 API key 并发 lease 的 Durable Object 与 helper",
-      "priority": 22,
-      "passes": true,
-      "acceptanceCriteria": [
-        "apps/api-worker 存在 API key concurrency Durable Object，实现 acquire/release 最小接口",
-        "存在 lib/concurrency helper，可按 apiKeyId 解析 DO stub 并调用 acquire/release",
-        "lease 数据至少覆盖 leaseId、apiKeyId、expiresAt 或等价 TTL 信息",
-        "实现保持单 key 最大并发门禁，不提前引入全局队列、优先级或多租户能力"
-      ]
-    },
-    {
-      "id": "M5-US2",
-      "title": "把并发门禁接入 gateway 请求生命周期",
-      "priority": 23,
-      "passes": true,
-      "acceptanceCriteria": [
-        "gateway 在上游调用前尝试 acquire lease，并在超限时返回 429",
-        "请求成功、失败、异常中断时都会释放 lease",
-        "lease 释放逻辑不会破坏现有 requests 落库与 trace_id 行为",
-        "实现仍只覆盖 /v1/chat/completions 最小路径"
-      ]
-    },
-    {
-      "id": "M5-US3",
-      "title": "验证 Milestone 5 最小链路",
-      "priority": 24,
-      "passes": true,
-      "acceptanceCriteria": [
-        "新增 DO 与 gateway 并发逻辑后 typecheck 与 build 通过",
-        "并发超限时返回 429",
-        "请求结束后 lease 可释放，后续请求可再次进入",
-        "验证结果被记录到 progress.txt"
-      ]
-    },
-    {
-      "id": "M6-US1",
-      "title": "补齐 portal session 读取与 key 状态校验",
-      "priority": 25,
-      "passes": true,
-      "acceptanceCriteria": [
-        "apps/api-worker 可从 portal_session cookie 读取 portal session",
-        "portal 读取接口会校验 session 未过期、未撤销，且对应 api key 仍 active/未过期",
-        "当 key disabled/revoked/expired 时，/portal/me 与 /portal/requests 返回 401",
-        "实现不引入 refresh token 或长会话续期"
-      ]
-    },
-    {
-      "id": "M6-US2",
-      "title": "提供 portal 概览与历史查询接口",
-      "priority": 26,
-      "passes": true,
-      "acceptanceCriteria": [
-        "apps/api-worker 存在 /portal/me 路由并返回 key 概览信息",
-        "apps/api-worker 存在 /portal/requests 路由并返回最近请求历史",
-        "请求历史复用 RequestHistoryItem 结构，不新增业务外字段",
-        "接口挂载不影响现有 /portal/auth 与 /v1/chat/completions"
-      ]
-    },
-    {
-      "id": "M6-US3",
-      "title": "实现 key-portal 登录后 overview/history 最小页面",
-      "priority": 27,
-      "passes": true,
-      "acceptanceCriteria": [
-        "apps/key-portal/src/main.tsx 在登录成功后会请求 /portal/me 与 /portal/requests",
-        "页面展示 key status、expiresAt、maxConcurrency、allowed endpoints",
-        "页面展示最近请求的 endpoint/status/httpStatus/latency/traceId/createdAt",
-        "保持单入口最小 UI，不提前引入复杂路由体系"
-      ]
-    },
-    {
-      "id": "M6-US4",
-      "title": "验证 Milestone 6 最小链路",
-      "priority": 28,
-      "passes": true,
-      "acceptanceCriteria": [
-        "apps/api-worker 与 apps/key-portal 的 typecheck/build 通过",
-        "portal exchange 后访问 /portal/me 与 /portal/requests 返回 200",
-        "disabled/revoked/expired key 对应 portal session 返回 401",
-        "验证结果被记录到 progress.txt"
-      ]
-    },
-    {
-      "id": "M7-US1",
-      "title": "补齐 API key revoke 最小生命周期能力",
-      "priority": 29,
-      "passes": true,
-      "acceptanceCriteria": [
-        "apps/api-worker 提供 admin.apiKeys.revoke 过程，可将指定 key 标记为 revoked 并写入 revokedAt",
-        "apps/admin-web 可对未 revoked 的 key 触发 revoke，并在列表中反映 revoked 状态",
-        "revoke 后该 key 无法继续通过 portal session 或 raw key 网关鉴权",
-        "实现不提前引入 rotate、批量操作或完整审计日志"
-      ]
-    },
-    {
-      "id": "M7-US2",
-      "title": "补齐 Milestone 7 最小验证",
-      "priority": 30,
-      "passes": true,
-      "acceptanceCriteria": [
-        "apps/api-worker 与 apps/admin-web 的 typecheck/build 通过",
-        "revoke 后 admin.apiKeys.list 可反映 revoked 状态",
-        "revoke 后 /portal/me 或 /portal/requests 返回 401，raw key gateway 鉴权失效",
-        "验证结果被记录到 progress.txt"
-      ]
-    },
-    {
-      "id": "V2-M1-US1",
-      "title": "硬化 OpenAI chat completions 热路径的 stream、timeout 与错误归类",
-      "priority": 31,
-      "passes": true,
-      "acceptanceCriteria": [
-        "apps/api-worker/src/routers/gateway/chat-completions.ts 在 stream=true 时不再整包读取上游响应，而是透传 text/event-stream 响应体",
-        "non-stream 请求仍返回与当前 OpenAI-compatible 路径兼容的 JSON/文本响应",
-        "gateway 返回统一错误结构，至少可区分 invalid_request、auth_error、upstream_error、upstream_timeout、network_error",
-        "requests 落库可记录失败归类，并保留 traceId、httpStatus、requestSize、responseSize"
-      ]
-    },
-    {
-      "id": "V2-M1-US2",
-      "title": "验证 OpenAI 热路径硬化的动态链路",
-      "priority": 32,
-      "passes": true,
-      "acceptanceCriteria": [
-        "apps/api-worker 与 packages/shared 的 typecheck/build 通过",
-        "stream=false 的 chat completions 请求可继续成功返回 200",
-        "stream=true 的 chat completions 请求可返回 text/event-stream 并透传上游分块",
-        "timeout 场景返回稳定错误结构，且对应 requests/audit 可辨认失败类型",
-        "验证结果被记录到 progress.txt"
-      ]
-    },
-    {
-      "id": "V2-M2-US1",
-      "title": "增加 Claude-compatible messages 最小入口",
-      "priority": 33,
-      "passes": true,
-      "acceptanceCriteria": [
-        "apps/api-worker 提供 `/anthropic/v1/messages` 最小入口，并复用现有 gateway key auth、channel 选择、并发 lease 与 request log 骨架",
-        "Claude messages 请求可被转换为上游 `/v1/chat/completions` 请求，成功响应可被转换回最小 Claude message 响应结构",
-        "当前范围只要求最小 non-stream messages 流程，不提前实现完整 Anthropic streaming 事件协议",
-        "admin 侧可为 API key 选择 `anthropic_messages` endpoint rule"
-      ]
-    },
-    {
-      "id": "V2-M2-US2",
-      "title": "验证 Claude-compatible messages 最小链路",
-      "priority": 34,
-      "passes": true,
-      "acceptanceCriteria": [
-        "apps/api-worker、packages/shared、apps/admin-web 的 typecheck/build 通过",
-        "admin 可创建允许 `anthropic_messages` 的 API key",
-        "携带允许的 raw key 调用 `/anthropic/v1/messages` 返回 200 与最小 Claude message 响应结构",
-        "audit 可读到 `endpoint=anthropic_messages`、traceId、status=completed、httpStatus=200，且验证结果被记录到 progress.txt"
-      ]
-    },
-    {
-      "id": "V2-M2-US3",
-      "title": "补齐 Claude-compatible messages 的最小 streaming 翻译",
-      "priority": 35,
-      "passes": true,
-      "acceptanceCriteria": [
-        "`/anthropic/v1/messages` 在 `stream=true` 时返回 `text/event-stream`，并把上游 OpenAI-style SSE 翻译成最小 Anthropic Messages 事件序列",
-        "最小事件序列至少包含 `message_start`、`content_block_start`、`content_block_delta`、`content_block_stop`、`message_delta`、`message_stop`",
-        "文本增量可通过 `content_block_delta.delta.type=text_delta` 正常输出，结束原因会映射到 Claude 风格 `stop_reason`",
-        "request log / audit 继续记录 `endpoint=anthropic_messages`、traceId、status 与 httpStatus"
-      ]
-    },
-    {
-      "id": "V2-M3-US1",
-      "title": "增加最小 health-aware routing 与跨 channel failover",
-      "priority": 36,
-      "passes": true,
-      "acceptanceCriteria": [
-        "当同一个 API key 允许多个 active channel 时，gateway 会按优先级顺序尝试 channel，而不是固定只用第一个 channel",
-        "对 timeout、network error 与 upstream 5xx，gateway 可在仍未回包前自动切到下一个允许 channel 重试",
-        "刚失败的 channel 会进入短暂冷却期，后续请求会优先跳过它",
-        "同一次请求仍只保留一条 requests/audit 记录，并反映最终成功 channel"
-      ]
-    },
-    {
-      "id": "V2-M3-US2",
-      "title": "补齐 Anthropic messages 的常用协议字段与 stop/usage 语义",
-      "priority": 37,
-      "passes": true,
-      "acceptanceCriteria": [
-        "`/anthropic/v1/messages` 请求至少接受并处理 `max_tokens`、`top_p`、`stop_sequences`、`metadata` 等常用字段（允许最小透传或本地兼容）",
-        "non-stream 响应包含 `usage`，且在命中 stop sequence 时返回 `stop_reason=stop_sequence` 与对应 `stop_sequence`",
-        "stream 响应中的 `message_start`/`message_delta` 带有 `usage`，并在命中 stop sequence 时返回正确的 `stop_reason` 与 `stop_sequence`",
-        "对应动态验证结果被记录到 progress.txt"
-      ]
-    },
-    {
-      "id": "V2-M3-US3",
-      "title": "补齐 Anthropic messages 的 block 输入兼容",
-      "priority": 38,
-      "passes": true,
-      "acceptanceCriteria": [
-        "`system` 支持 text blocks 数组输入，并可被规整到当前最小转发链路",
-        "`messages[].content` 支持 `tool_result` block，并可被规整为可转发文本而不报 schema 错误",
-        "对应动态验证结果被记录到 progress.txt"
-      ]
-    },
-    {
-      "id": "V2-M3-US4",
-      "title": "补齐 Anthropic messages 的 non-stream tool_use 输出",
-      "priority": 39,
-      "passes": true,
-      "acceptanceCriteria": [
-        "当上游 OpenAI chat completion 返回 `tool_calls` 时，`/anthropic/v1/messages` 的 non-stream 响应会翻译为 Claude `tool_use` content block",
-        "tool call 的 `function.arguments` 会被尽量解析为结构化 `input` 对象，无法解析时至少保底为可消费对象",
-        "存在 `tool_use` block 时，响应会返回 `stop_reason=tool_use`，且对应动态验证结果被记录到 progress.txt"
-      ]
-    },
-    {
-      "id": "V2-M3-US5",
-      "title": "补齐 Anthropic messages 的 stream tool_use 输出",
-      "priority": 40,
-      "passes": true,
-      "acceptanceCriteria": [
-        "当上游 OpenAI streaming chunk 返回 `tool_calls` 增量时，`/anthropic/v1/messages` 会输出 Claude 风格 `tool_use` block 事件序列",
-        "最小事件序列至少包含 `content_block_start(type=tool_use)`、`content_block_delta(type=input_json_delta)`、`content_block_stop`、`message_delta(stop_reason=tool_use)`、`message_stop`",
-        "对应动态验证结果被记录到 progress.txt"
-      ]
-    },
-    {
-      "id": "V2-M3-US6",
-      "title": "补齐 Anthropic messages 的 stream tool_call 分片兼容",
-      "priority": 41,
-      "passes": true,
-      "acceptanceCriteria": [
-        "当上游将同一个 `tool_call` 的 `function.arguments` 拆成多个 streaming chunk 时，`/anthropic/v1/messages` 仍会聚合到同一个 Claude `tool_use` block index",
-        "分片场景下会连续输出多个 `content_block_delta(type=input_json_delta)`，并保持单个 `content_block_start`/`content_block_stop` 配对",
-        "对应动态验证结果被记录到 progress.txt"
-      ]
+    }
+  ]
+}

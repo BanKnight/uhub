@@ -117,14 +117,16 @@ async function main() {
         `Unexpected finishReason: ${json.candidates[0]?.finishReason}`
       );
       assert(
-        typeof json?.usageMetadata?.promptTokenCount === 'number' &&
-          json.usageMetadata.promptTokenCount > 0,
-        'promptTokenCount should be > 0'
+        json?.usageMetadata?.promptTokenCount === null,
+        `Expected promptTokenCount=null: ${JSON.stringify(json)}`
       );
       assert(
-        typeof json?.usageMetadata?.candidatesTokenCount === 'number' &&
-          json.usageMetadata.candidatesTokenCount > 0,
-        'candidatesTokenCount should be > 0'
+        json?.usageMetadata?.candidatesTokenCount === null,
+        `Expected candidatesTokenCount=null: ${JSON.stringify(json)}`
+      );
+      assert(
+        json?.usageMetadata?.totalTokenCount === null,
+        `Expected totalTokenCount=null: ${JSON.stringify(json)}`
       );
 
       console.log(

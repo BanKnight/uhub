@@ -1,6 +1,5 @@
 import {
   type AnthropicMessage,
-  type AnthropicUsage,
   type ChatCompletionsResponse,
   type ChatMessage,
   anthropicMessagesRequestSchema,
@@ -203,18 +202,6 @@ function applyStopSequences(text: string, stopSequences: string[] | undefined) {
   };
 }
 
-function estimateAnthropicUsage(input: {
-  requestBody: string;
-  responseText: string;
-}): AnthropicUsage {
-  const encoder = new TextEncoder();
-
-  return {
-    input_tokens: Math.max(1, Math.ceil(encoder.encode(input.requestBody).byteLength / 4)),
-    output_tokens: Math.max(1, Math.ceil(encoder.encode(input.responseText).byteLength / 4)),
-  };
-}
-
 function parseToolUseInput(argumentsText: string) {
   if (!argumentsText.trim()) {
     return {};
@@ -295,7 +282,6 @@ function createAnthropicStreamResponse(input: {
   upstreamResponse: Response;
   traceId: string;
   fallbackModel: string;
-  requestBody: string;
   stopSequences: string[] | undefined;
 }) {
   const encoder = new TextEncoder();
@@ -330,10 +316,10 @@ function createAnthropicStreamResponse(input: {
       started: boolean;
     }
   >();
-  const usage = estimateAnthropicUsage({
-    requestBody: input.requestBody,
-    responseText: '',
-  });
+  const usage: { input_tokens: number | null; output_tokens: number | null } = {
+    input_tokens: null,
+    output_tokens: null,
+  };
 
   const emit = (
     controller: ReadableStreamDefaultController<Uint8Array>,
@@ -433,19 +419,6 @@ function createAnthropicStreamResponse(input: {
     }
 
     streamToolUses.set(toolCallIndex, toolUse);
-
-    usage.output_tokens = Math.max(
-      1,
-      Math.ceil(
-        new TextEncoder().encode(
-          JSON.stringify({
-            id: toolUse.id,
-            name: toolUse.name,
-            input: parseToolUseInput(toolUse.inputBuffer),
-          })
-        ).byteLength / 4
-      )
-    );
   };
 
   const stopMessage = (controller: ReadableStreamDefaultController<Uint8Array>) => {
@@ -494,6 +467,11 @@ function createAnthropicStreamResponse(input: {
     const payload = parsedJson as {
       id?: string;
       model?: string;
+      usage?: {
+        prompt_tokens?: number;
+        completion_tokens?: number;
+        total_tokens?: number;
+      };
       choices?: Array<{
         delta?: {
           content?: string;
@@ -509,6 +487,15 @@ function createAnthropicStreamResponse(input: {
       }>;
     };
     const choice = payload.choices?.[0];
+
+    if (payload.usage) {
+      usage.input_tokens =
+        typeof payload.usage.prompt_tokens === 'number' ? payload.usage.prompt_tokens : null;
+      usage.output_tokens =
+        typeof payload.usage.completion_tokens === 'number'
+          ? payload.usage.completion_tokens
+          : null;
+    }
 
     if (payload.id) {
       responseId = payload.id;
@@ -526,10 +513,6 @@ function createAnthropicStreamResponse(input: {
       const textDelta = stopMatch.text.slice(emittedText.length);
 
       emittedText = stopMatch.text;
-      usage.output_tokens = Math.max(
-        1,
-        Math.ceil(new TextEncoder().encode(emittedText).byteLength / 4)
-      );
 
       if (textDelta.length > 0) {
         const index = startTextBlock(controller);
@@ -720,7 +703,6 @@ anthropicMessagesRouter.post('/v1/messages', async (c) => {
         upstreamResponse,
         traceId: upstreamTraceId,
         fallbackModel: parsed.data.model,
-        requestBody: rawBody,
         stopSequences: parsed.data.stop_sequences,
       }),
     onSuccess: ({ responseBody, traceId: upstreamTraceId }) => {
@@ -751,10 +733,6 @@ anthropicMessagesRouter.post('/v1/messages', async (c) => {
         firstChoice?.message ?? { role: 'assistant', content: '' },
         parsed.data.stop_sequences
       );
-      const usage = estimateAnthropicUsage({
-        requestBody: rawBody,
-        responseText: translatedContent.responseText,
-      });
       const finishReason = firstChoice?.finishReason ?? firstChoice?.finish_reason ?? null;
       const hasToolUse = translatedContent.content.some((block) => block.type === 'tool_use');
 
@@ -771,7 +749,10 @@ anthropicMessagesRouter.post('/v1/messages', async (c) => {
               ? 'tool_use'
               : (mapFinishReasonToStopReason(finishReason) ?? 'end_turn'),
           stop_sequence: translatedContent.stopSequence,
-          usage,
+          usage: {
+            input_tokens: parsedResponse.data.usage?.prompt_tokens ?? null,
+            output_tokens: parsedResponse.data.usage?.completion_tokens ?? null,
+          },
         }),
         {
           status: 200,

@@ -14,13 +14,16 @@ import {
   redirect,
   useNavigate,
 } from '@tanstack/react-router';
+import { channelProviderProtocolMap } from '@uhub/shared';
 import type {
   AnalyticsSummary,
   ApiKey,
   AuditRequestItem,
   Channel,
+  ChannelProvider,
   CreateApiKeyInput,
   CreateChannelInput,
+  UpdateChannelInput,
   UpdateChannelStatusInput,
 } from '@uhub/shared';
 import React from 'react';
@@ -33,6 +36,7 @@ import {
   listChannels,
   revokeApiKey as revokeApiKeyRequest,
   rotateApiKey as rotateApiKeyRequest,
+  updateChannel as updateChannelRequest,
   updateChannelStatus,
 } from './lib/api';
 import { adminAuthClient, getAdminSession } from './lib/auth';
@@ -45,12 +49,11 @@ const auditQueryKey = ['admin', 'audit'];
 const sessionQueryKey = ['admin', 'session'];
 const initialChannelForm: CreateChannelInput = {
   name: '',
-  provider: '',
+  provider: 'openai',
   protocol: 'openai_chat_completions',
   baseUrl: 'https://example.com',
   models: [],
   status: 'active',
-  configJson: '{}',
 };
 const initialApiKeyForm: CreateApiKeyInput = {
   label: '',
@@ -69,11 +72,11 @@ const endpointOptions: CreateApiKeyInput['endpointRules'] = [
   'gemini_contents',
 ];
 
-const protocolOptions: CreateChannelInput['protocol'][] = [
-  'openai_chat_completions',
-  'anthropic_messages',
-  'gemini_contents',
-];
+const providerOptions: ChannelProvider[] = ['openai', 'anthropic', 'gemini'];
+
+function isStructuredProvider(provider: string): provider is ChannelProvider {
+  return providerOptions.includes(provider as ChannelProvider);
+}
 
 function parseModelsInput(value: string) {
   return value
@@ -169,6 +172,10 @@ function SignInPage() {
   );
 }
 
+function formatNullableMetric(value: number | null) {
+  return value === null ? 'n/a' : value;
+}
+
 function AnalyticsSection({ analytics }: { analytics: AnalyticsSummary }) {
   return (
     <section>
@@ -184,6 +191,10 @@ function AnalyticsSection({ analytics }: { analytics: AnalyticsSummary }) {
           Success rate:{' '}
           {analytics.successRate === null ? 'n/a' : `${(analytics.successRate * 100).toFixed(1)}%`}
         </li>
+        <li>Input tokens: {formatNullableMetric(analytics.inputTokens)}</li>
+        <li>Output tokens: {formatNullableMetric(analytics.outputTokens)}</li>
+        <li>Total tokens: {formatNullableMetric(analytics.totalTokens)}</li>
+        <li>Token availability: {analytics.tokenUsageAvailability}</li>
       </ul>
 
       <h3>By endpoint</h3>
@@ -201,6 +212,10 @@ function AnalyticsSection({ analytics }: { analytics: AnalyticsSummary }) {
               Success rate:{' '}
               {item.successRate === null ? 'n/a' : `${(item.successRate * 100).toFixed(1)}%`}
             </div>
+            <div>Input tokens: {formatNullableMetric(item.inputTokens)}</div>
+            <div>Output tokens: {formatNullableMetric(item.outputTokens)}</div>
+            <div>Total tokens: {formatNullableMetric(item.totalTokens)}</div>
+            <div>Token availability: {item.tokenUsageAvailability}</div>
           </li>
         ))}
       </ul>
@@ -221,6 +236,10 @@ function AnalyticsSection({ analytics }: { analytics: AnalyticsSummary }) {
               Success rate:{' '}
               {item.successRate === null ? 'n/a' : `${(item.successRate * 100).toFixed(1)}%`}
             </div>
+            <div>Input tokens: {formatNullableMetric(item.inputTokens)}</div>
+            <div>Output tokens: {formatNullableMetric(item.outputTokens)}</div>
+            <div>Total tokens: {formatNullableMetric(item.totalTokens)}</div>
+            <div>Token availability: {item.tokenUsageAvailability}</div>
           </li>
         ))}
       </ul>
@@ -329,6 +348,10 @@ function AuditSection({
             <div>HTTP: {item.httpStatus ?? 'n/a'}</div>
             <div>Latency: {item.latencyMs ?? 'n/a'}</div>
             <div>Trace: {item.traceId ?? 'n/a'}</div>
+            <div>Input tokens: {formatNullableMetric(item.inputTokens)}</div>
+            <div>Output tokens: {formatNullableMetric(item.outputTokens)}</div>
+            <div>Total tokens: {formatNullableMetric(item.totalTokens)}</div>
+            <div>Token availability: {item.tokenUsageAvailability}</div>
             <div>Created: {new Date(item.createdAt).toISOString()}</div>
           </li>
         ))}
@@ -343,6 +366,7 @@ function ChannelsPage() {
   const [form, setForm] = React.useState<CreateChannelInput>(initialChannelForm);
   const [apiKeyForm, setApiKeyForm] = React.useState<CreateApiKeyInput>(initialApiKeyForm);
   const [modelsInput, setModelsInput] = React.useState('');
+  const [editingChannelId, setEditingChannelId] = React.useState<string | null>(null);
   const [requestQuotaInput, setRequestQuotaInput] = React.useState('');
   const [expiresAtInput, setExpiresAtInput] = React.useState('');
   const [createdRawKey, setCreatedRawKey] = React.useState<string | null>(null);
@@ -400,7 +424,19 @@ function ChannelsPage() {
     onSuccess: async () => {
       setForm({ ...initialChannelForm });
       setModelsInput('');
+      setEditingChannelId(null);
       await queryClient.invalidateQueries({ queryKey: channelsQueryKey });
+    },
+  });
+
+  const updateChannelMutation = useMutation({
+    mutationFn: (input: UpdateChannelInput) => updateChannelRequest(input),
+    onSuccess: async () => {
+      setForm({ ...initialChannelForm });
+      setModelsInput('');
+      setEditingChannelId(null);
+      await queryClient.invalidateQueries({ queryKey: channelsQueryKey });
+      await queryClient.invalidateQueries({ queryKey: apiKeysQueryKey });
     },
   });
 
@@ -470,10 +506,20 @@ function ChannelsPage() {
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          createChannelMutation.mutate({
+          const payload = {
             ...form,
             models: parseModelsInput(modelsInput),
-          });
+          };
+
+          if (editingChannelId) {
+            updateChannelMutation.mutate({
+              id: editingChannelId,
+              ...payload,
+            });
+            return;
+          }
+
+          createChannelMutation.mutate(payload);
         }}
       >
         <div>
@@ -486,38 +532,31 @@ function ChannelsPage() {
         </div>
         <div>
           <label htmlFor="channel-provider">Provider</label>
-          <input
+          <select
             id="channel-provider"
             value={form.provider}
-            onChange={(event) =>
+            onChange={(event) => {
+              const provider = event.target.value as ChannelProvider;
               setForm((current) => ({
                 ...current,
-                provider: event.target.value,
-              }))
-            }
-          />
-        </div>
-        <div>
-          <label htmlFor="channel-protocol">Protocol</label>
-          <select
-            id="channel-protocol"
-            value={form.protocol}
-            onChange={(event) =>
-              setForm((current) => ({
-                ...current,
-                protocol: event.target.value as CreateChannelInput['protocol'],
-              }))
-            }
+                provider,
+                protocol: channelProviderProtocolMap[provider],
+              }));
+            }}
           >
-            {protocolOptions.map((protocol) => (
-              <option key={protocol} value={protocol}>
-                {protocol}
+            {providerOptions.map((provider) => (
+              <option key={provider} value={provider}>
+                {provider}
               </option>
             ))}
           </select>
         </div>
         <div>
-          <label htmlFor="channel-base-url">Base URL</label>
+          <label htmlFor="channel-protocol">Protocol</label>
+          <input id="channel-protocol" value={form.protocol} readOnly />
+        </div>
+        <div>
+          <label htmlFor="channel-base-url">Upstream Base URL</label>
           <input
             id="channel-base-url"
             value={form.baseUrl}
@@ -546,7 +585,7 @@ function ChannelsPage() {
           </select>
         </div>
         <div>
-          <label htmlFor="channel-models">Models</label>
+          <label htmlFor="channel-models">Allowed Models</label>
           <input
             id="channel-models"
             value={modelsInput}
@@ -554,41 +593,75 @@ function ChannelsPage() {
             placeholder="gpt-4o-mini, claude-3-5-sonnet, gemini-2.5-flash"
           />
         </div>
-        <div>
-          <label htmlFor="channel-config-json">Config JSON</label>
-          <textarea
-            id="channel-config-json"
-            value={form.configJson}
-            onChange={(event) =>
-              setForm((current) => ({
-                ...current,
-                configJson: event.target.value,
-              }))
-            }
-          />
-        </div>
-        <button type="submit" disabled={createChannelMutation.isPending}>
-          {createChannelMutation.isPending ? 'Creating...' : 'Create channel'}
+        <button
+          type="submit"
+          disabled={createChannelMutation.isPending || updateChannelMutation.isPending}
+        >
+          {editingChannelId
+            ? updateChannelMutation.isPending
+              ? 'Saving...'
+              : 'Save channel'
+            : createChannelMutation.isPending
+              ? 'Creating...'
+              : 'Create channel'}
         </button>
+        {editingChannelId ? (
+          <button
+            type="button"
+            onClick={() => {
+              setEditingChannelId(null);
+              setForm({ ...initialChannelForm });
+              setModelsInput('');
+            }}
+          >
+            Cancel edit
+          </button>
+        ) : null}
       </form>
 
       {channelsQuery.isPending ? <p>Loading channels...</p> : null}
       {channelsQuery.error ? <p>Failed to load channels.</p> : null}
       {createChannelMutation.error ? <p>Failed to create channel.</p> : null}
+      {updateChannelMutation.error ? <p>Failed to update channel.</p> : null}
       {updateStatusMutation.error ? <p>Failed to update channel status.</p> : null}
       {!channelsQuery.isPending && channels.length === 0 ? <p>No channels yet.</p> : null}
 
       <ul>
         {channels.map((channel: Channel) => {
           const nextStatus = channel.status === 'active' ? 'disabled' : 'active';
+          const canEdit = isStructuredProvider(channel.provider);
           return (
             <li key={channel.id}>
               <strong>{channel.name}</strong>
               <div>Provider: {channel.provider}</div>
               <div>Protocol: {channel.protocol}</div>
-              <div>Base URL: {channel.baseUrl}</div>
+              <div>Upstream Base URL: {channel.baseUrl}</div>
               <div>Models: {channel.models.length > 0 ? channel.models.join(', ') : 'n/a'}</div>
+              <div>
+                Legacy configJson: {channel.configJson === '{}' ? 'n/a' : channel.configJson}
+              </div>
               <div>Status: {channel.status}</div>
+              {canEdit ? (
+                <button
+                  type="button"
+                  disabled={updateChannelMutation.isPending}
+                  onClick={() => {
+                    const provider = channel.provider as ChannelProvider;
+                    setEditingChannelId(channel.id);
+                    setForm({
+                      name: channel.name,
+                      provider,
+                      protocol: channel.protocol,
+                      baseUrl: channel.baseUrl,
+                      models: channel.models,
+                      status: channel.status,
+                    });
+                    setModelsInput(channel.models.join(', '));
+                  }}
+                >
+                  Edit
+                </button>
+              ) : null}
               <button
                 type="button"
                 disabled={updateStatusMutation.isPending}

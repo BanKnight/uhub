@@ -17,6 +17,25 @@ const rejectedRequestsExpr =
     Number
   );
 const avgLatencyMsExpr = sql<number | null>`cast(avg(${requests.latencyMs}) as integer)`;
+const availableCountExpr =
+  sql<number>`coalesce(sum(case when ${requests.tokenUsageAvailability} = 'available' then 1 else 0 end), 0)`.mapWith(
+    Number
+  );
+const unavailableCountExpr =
+  sql<number>`coalesce(sum(case when ${requests.tokenUsageAvailability} = 'unavailable' then 1 else 0 end), 0)`.mapWith(
+    Number
+  );
+const inputTokensExpr = sql<number | null>`sum(${requests.inputTokens})`;
+const outputTokensExpr = sql<number | null>`sum(${requests.outputTokens})`;
+const totalTokensExpr = sql<number | null>`sum(${requests.totalTokens})`;
+
+type AnalyticsTokenAggregateRow = {
+  availableCount: number;
+  unavailableCount: number;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  totalTokens: number | null;
+};
 
 function toNullableNumber(value: number | null) {
   return value === null ? null : Number(value);
@@ -30,6 +49,27 @@ function toSuccessRate(completedRequests: number, totalRequests: number) {
   return completedRequests / totalRequests;
 }
 
+function toSummaryTokenUsageAvailability(row: AnalyticsTokenAggregateRow) {
+  if (row.availableCount === 0) {
+    return 'unavailable' as const;
+  }
+
+  if (row.unavailableCount === 0) {
+    return 'available' as const;
+  }
+
+  return 'partial' as const;
+}
+
+function toAnalyticsTokenSummary(row: AnalyticsTokenAggregateRow) {
+  return {
+    inputTokens: row.availableCount > 0 ? (toNullableNumber(row.inputTokens) ?? 0) : null,
+    outputTokens: row.availableCount > 0 ? (toNullableNumber(row.outputTokens) ?? 0) : null,
+    totalTokens: row.availableCount > 0 ? (toNullableNumber(row.totalTokens) ?? 0) : null,
+    tokenUsageAvailability: toSummaryTokenUsageAvailability(row),
+  };
+}
+
 async function listEndpointAnalytics(env: WorkerEnv): Promise<EndpointAnalyticsItem[]> {
   const db = getDb(env);
   const rows = await db
@@ -40,6 +80,11 @@ async function listEndpointAnalytics(env: WorkerEnv): Promise<EndpointAnalyticsI
       failedRequests: failedRequestsExpr,
       rejectedRequests: rejectedRequestsExpr,
       avgLatencyMs: avgLatencyMsExpr,
+      availableCount: availableCountExpr,
+      unavailableCount: unavailableCountExpr,
+      inputTokens: inputTokensExpr,
+      outputTokens: outputTokensExpr,
+      totalTokens: totalTokensExpr,
     })
     .from(requests)
     .groupBy(requests.endpoint)
@@ -53,6 +98,7 @@ async function listEndpointAnalytics(env: WorkerEnv): Promise<EndpointAnalyticsI
     rejectedRequests: row.rejectedRequests,
     avgLatencyMs: toNullableNumber(row.avgLatencyMs),
     successRate: toSuccessRate(row.completedRequests, row.totalRequests),
+    ...toAnalyticsTokenSummary(row),
   }));
 }
 
@@ -67,6 +113,11 @@ async function listChannelAnalytics(env: WorkerEnv): Promise<ChannelAnalyticsIte
       failedRequests: failedRequestsExpr,
       rejectedRequests: rejectedRequestsExpr,
       avgLatencyMs: avgLatencyMsExpr,
+      availableCount: availableCountExpr,
+      unavailableCount: unavailableCountExpr,
+      inputTokens: inputTokensExpr,
+      outputTokens: outputTokensExpr,
+      totalTokens: totalTokensExpr,
     })
     .from(requests)
     .leftJoin(channels, eq(requests.channelId, channels.id))
@@ -83,6 +134,7 @@ async function listChannelAnalytics(env: WorkerEnv): Promise<ChannelAnalyticsIte
     rejectedRequests: row.rejectedRequests,
     avgLatencyMs: toNullableNumber(row.avgLatencyMs),
     successRate: toSuccessRate(row.completedRequests, row.totalRequests),
+    ...toAnalyticsTokenSummary(row),
   }));
 }
 
@@ -95,6 +147,11 @@ export async function getAnalyticsSummary(env: WorkerEnv): Promise<AnalyticsSumm
       failedRequests: failedRequestsExpr,
       rejectedRequests: rejectedRequestsExpr,
       avgLatencyMs: avgLatencyMsExpr,
+      availableCount: availableCountExpr,
+      unavailableCount: unavailableCountExpr,
+      inputTokens: inputTokensExpr,
+      outputTokens: outputTokensExpr,
+      totalTokens: totalTokensExpr,
     })
     .from(requests);
   const [endpointBreakdown, channelBreakdown] = await Promise.all([
@@ -104,6 +161,13 @@ export async function getAnalyticsSummary(env: WorkerEnv): Promise<AnalyticsSumm
 
   const totalRequests = overview?.totalRequests ?? 0;
   const completedRequests = overview?.completedRequests ?? 0;
+  const tokenSummary = toAnalyticsTokenSummary({
+    availableCount: overview?.availableCount ?? 0,
+    unavailableCount: overview?.unavailableCount ?? 0,
+    inputTokens: overview?.inputTokens ?? null,
+    outputTokens: overview?.outputTokens ?? null,
+    totalTokens: overview?.totalTokens ?? null,
+  });
 
   return {
     totalRequests,
@@ -112,6 +176,7 @@ export async function getAnalyticsSummary(env: WorkerEnv): Promise<AnalyticsSumm
     rejectedRequests: overview?.rejectedRequests ?? 0,
     avgLatencyMs: toNullableNumber(overview?.avgLatencyMs ?? null),
     successRate: toSuccessRate(completedRequests, totalRequests),
+    ...tokenSummary,
     endpointBreakdown,
     channelBreakdown,
   };

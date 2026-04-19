@@ -1,14 +1,16 @@
 import type {
   AuditListInput,
   AuditRequestItem,
+  ApiKeyUsageSummary,
   GatewayEndpoint,
   GatewayFailureClass,
   GatewayRequestStatus,
   RequestHistoryItem,
 } from '@uhub/shared';
-import { and, desc, eq, like } from 'drizzle-orm';
+import { and, desc, eq, like, sql } from 'drizzle-orm';
 import { apiKeys, channels, getDb, requests } from '../db/schema';
 import type { WorkerEnv } from '../index';
+import type { RequestTokenUsage } from '../services/request-log/request-log';
 
 type CreateRequestRecordInput = {
   apiKeyId: string;
@@ -27,7 +29,132 @@ type FinishRequestRecordInput = {
   httpStatus: number | null;
   latencyMs: number;
   responseSize: number | null;
+  usage: RequestTokenUsage | null;
 };
+
+type TokenUsageAggregateRow = {
+  availableCount: number;
+  unavailableCount: number;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  totalTokens: number | null;
+};
+
+function toSummaryTokenUsageAvailability(row: TokenUsageAggregateRow) {
+  if (row.availableCount === 0) {
+    return 'unavailable' as const;
+  }
+
+  if (row.unavailableCount === 0) {
+    return 'available' as const;
+  }
+
+  return 'partial' as const;
+}
+
+export function toRequestTokenUsage(
+  usage:
+    | {
+        inputTokens?: number | null;
+        outputTokens?: number | null;
+        totalTokens?: number | null;
+      }
+    | null
+    | undefined
+): RequestTokenUsage {
+  const inputTokens = usage?.inputTokens ?? null;
+  const outputTokens = usage?.outputTokens ?? null;
+  const totalTokens = usage?.totalTokens ?? null;
+  const allPresent = inputTokens !== null && outputTokens !== null && totalTokens !== null;
+
+  return {
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    tokenUsageAvailability: allPresent ? 'available' : 'unavailable',
+  };
+}
+
+function mapRequestRowToHistoryItem(row: typeof requests.$inferSelect): RequestHistoryItem {
+  return {
+    id: row.id,
+    endpoint: row.endpoint as GatewayEndpoint,
+    model: row.model ?? null,
+    channelId: row.channelId ?? null,
+    traceId: row.traceId ?? null,
+    status: row.status,
+    failureClass: row.failureClass ?? null,
+    httpStatus: row.httpStatus ?? null,
+    latencyMs: row.latencyMs ?? null,
+    requestSize: row.requestSize ?? null,
+    responseSize: row.responseSize ?? null,
+    inputTokens: row.inputTokens ?? null,
+    outputTokens: row.outputTokens ?? null,
+    totalTokens: row.totalTokens ?? null,
+    tokenUsageAvailability: row.tokenUsageAvailability,
+    startedAt: row.startedAt,
+    finishedAt: row.finishedAt ?? null,
+    createdAt: row.createdAt,
+  };
+}
+
+function toApiKeyUsageSummary(input: {
+  totalRequests: number;
+  successRequests: number;
+  failedRequests: number;
+  rejectedRequests: number;
+  lastUsedAt: number | null;
+  requestLimit: number | null;
+  tokenUsage: TokenUsageAggregateRow;
+}): ApiKeyUsageSummary {
+  return {
+    totalRequests: input.totalRequests,
+    successRequests: input.successRequests,
+    failedRequests: input.failedRequests,
+    rejectedRequests: input.rejectedRequests,
+    inputTokens: input.tokenUsage.availableCount > 0 ? (input.tokenUsage.inputTokens ?? 0) : null,
+    outputTokens: input.tokenUsage.availableCount > 0 ? (input.tokenUsage.outputTokens ?? 0) : null,
+    totalTokens: input.tokenUsage.availableCount > 0 ? (input.tokenUsage.totalTokens ?? 0) : null,
+    tokenUsageAvailability: toSummaryTokenUsageAvailability(input.tokenUsage),
+    lastUsedAt: input.lastUsedAt,
+    quotaLimit: input.requestLimit,
+    quotaUsed: input.totalRequests,
+    quotaRemaining:
+      input.requestLimit === null ? null : Math.max(input.requestLimit - input.totalRequests, 0),
+  };
+}
+
+async function getTokenUsageAggregate(
+  env: WorkerEnv,
+  apiKeyId: string
+): Promise<TokenUsageAggregateRow> {
+  const db = getDb(env);
+  const row = await db
+    .select({
+      availableCount:
+        sql<number>`coalesce(sum(case when ${requests.tokenUsageAvailability} = 'available' then 1 else 0 end), 0)`.mapWith(
+          Number
+        ),
+      unavailableCount:
+        sql<number>`coalesce(sum(case when ${requests.tokenUsageAvailability} = 'unavailable' then 1 else 0 end), 0)`.mapWith(
+          Number
+        ),
+      inputTokens: sql<number | null>`sum(${requests.inputTokens})`,
+      outputTokens: sql<number | null>`sum(${requests.outputTokens})`,
+      totalTokens: sql<number | null>`sum(${requests.totalTokens})`,
+    })
+    .from(requests)
+    .where(eq(requests.apiKeyId, apiKeyId))
+    .get();
+
+  return {
+    availableCount: row?.availableCount ?? 0,
+    unavailableCount: row?.unavailableCount ?? 0,
+    inputTokens: row?.inputTokens === null ? null : Number(row?.inputTokens),
+    outputTokens: row?.outputTokens === null ? null : Number(row?.outputTokens),
+    totalTokens: row?.totalTokens === null ? null : Number(row?.totalTokens),
+  };
+}
 
 export async function createRequestRecord(env: WorkerEnv, input: CreateRequestRecordInput) {
   const db = getDb(env);
@@ -47,6 +174,10 @@ export async function createRequestRecord(env: WorkerEnv, input: CreateRequestRe
     latencyMs: null,
     requestSize: input.requestSize,
     responseSize: null,
+    inputTokens: null,
+    outputTokens: null,
+    totalTokens: null,
+    tokenUsageAvailability: 'unavailable',
     payloadRef: null,
     startedAt: now,
     finishedAt: null,
@@ -75,22 +206,7 @@ export async function listRequestsByApiKey(
     .orderBy(desc(requests.createdAt))
     .limit(20);
 
-  return rows.map((row) => ({
-    id: row.id,
-    endpoint: row.endpoint as GatewayEndpoint,
-    model: row.model ?? null,
-    channelId: row.channelId ?? null,
-    traceId: row.traceId ?? null,
-    status: row.status,
-    failureClass: row.failureClass ?? null,
-    httpStatus: row.httpStatus ?? null,
-    latencyMs: row.latencyMs ?? null,
-    requestSize: row.requestSize ?? null,
-    responseSize: row.responseSize ?? null,
-    startedAt: row.startedAt,
-    finishedAt: row.finishedAt ?? null,
-    createdAt: row.createdAt,
-  }));
+  return rows.map(mapRequestRowToHistoryItem);
 }
 
 export async function listRecentRequestsForAdmin(
@@ -120,6 +236,10 @@ export async function listRecentRequestsForAdmin(
       failureClass: requests.failureClass,
       httpStatus: requests.httpStatus,
       latencyMs: requests.latencyMs,
+      inputTokens: requests.inputTokens,
+      outputTokens: requests.outputTokens,
+      totalTokens: requests.totalTokens,
+      tokenUsageAvailability: requests.tokenUsageAvailability,
       createdAt: requests.createdAt,
     })
     .from(requests)
@@ -143,13 +263,63 @@ export async function listRecentRequestsForAdmin(
     failureClass: row.failureClass ?? null,
     httpStatus: row.httpStatus ?? null,
     latencyMs: row.latencyMs ?? null,
+    inputTokens: row.inputTokens ?? null,
+    outputTokens: row.outputTokens ?? null,
+    totalTokens: row.totalTokens ?? null,
+    tokenUsageAvailability: row.tokenUsageAvailability,
     createdAt: row.createdAt,
   }));
+}
+
+export async function getApiKeyUsageSummaryRow(
+  env: WorkerEnv,
+  apiKeyId: string
+): Promise<ApiKeyUsageSummary> {
+  const db = getDb(env);
+  const [apiKey, overview, tokenUsage] = await Promise.all([
+    db.select().from(apiKeys).where(eq(apiKeys.id, apiKeyId)).get(),
+    db
+      .select({
+        totalRequests: sql<number>`count(*)`.mapWith(Number),
+        successRequests:
+          sql<number>`coalesce(sum(case when ${requests.status} = 'completed' then 1 else 0 end), 0)`.mapWith(
+            Number
+          ),
+        failedRequests:
+          sql<number>`coalesce(sum(case when ${requests.status} = 'failed' then 1 else 0 end), 0)`.mapWith(
+            Number
+          ),
+        rejectedRequests:
+          sql<number>`coalesce(sum(case when ${requests.status} = 'rejected' then 1 else 0 end), 0)`.mapWith(
+            Number
+          ),
+        lastUsedAt: sql<number | null>`max(${requests.createdAt})`,
+      })
+      .from(requests)
+      .where(eq(requests.apiKeyId, apiKeyId))
+      .get(),
+    getTokenUsageAggregate(env, apiKeyId),
+  ]);
+
+  const totalRequests = overview?.totalRequests ?? 0;
+  const requestLimit = apiKey?.requestQuotaLimit ?? null;
+  const lastUsedAt = overview?.lastUsedAt === null ? null : Number(overview?.lastUsedAt ?? null);
+
+  return toApiKeyUsageSummary({
+    totalRequests,
+    successRequests: overview?.successRequests ?? 0,
+    failedRequests: overview?.failedRequests ?? 0,
+    rejectedRequests: overview?.rejectedRequests ?? 0,
+    lastUsedAt,
+    requestLimit,
+    tokenUsage,
+  });
 }
 
 export async function finishRequestRecord(env: WorkerEnv, input: FinishRequestRecordInput) {
   const db = getDb(env);
   const finishedAt = Date.now();
+  const usage = input.usage ?? toRequestTokenUsage(null);
 
   await db
     .update(requests)
@@ -160,6 +330,10 @@ export async function finishRequestRecord(env: WorkerEnv, input: FinishRequestRe
       httpStatus: input.httpStatus,
       latencyMs: input.latencyMs,
       responseSize: input.responseSize,
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      totalTokens: usage.totalTokens,
+      tokenUsageAvailability: usage.tokenUsageAvailability,
       finishedAt,
     })
     .where(eq(requests.id, input.id));

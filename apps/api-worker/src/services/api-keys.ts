@@ -1,19 +1,13 @@
 import { TRPCError } from '@trpc/server';
-import { asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import { asc, desc, eq, inArray } from 'drizzle-orm';
 import type {
   ApiKey,
   ApiKeyUsageSummary,
   CreateApiKeyInput,
   CreateApiKeyResult,
 } from '@uhub/shared';
-import {
-  apiKeyChannelRules,
-  apiKeyEndpointRules,
-  apiKeys,
-  channels,
-  getDb,
-  requests,
-} from '../db/schema';
+import { apiKeyChannelRules, apiKeyEndpointRules, apiKeys, channels, getDb } from '../db/schema';
+import { getApiKeyUsageSummaryRow } from '../repositories/requests-repo';
 import type { WorkerEnv } from '../index';
 
 type ApiKeyLookup = {
@@ -127,48 +121,7 @@ export async function getApiKeyUsageSummary(
   env: WorkerEnv,
   apiKeyId: string
 ): Promise<ApiKeyUsageSummary> {
-  const db = getDb(env);
-  const [apiKey, overview] = await Promise.all([
-    db.select().from(apiKeys).where(eq(apiKeys.id, apiKeyId)).get(),
-    db
-      .select({
-        totalRequests: sql<number>`count(*)`.mapWith(Number),
-        successRequests:
-          sql<number>`coalesce(sum(case when ${requests.status} = 'completed' then 1 else 0 end), 0)`.mapWith(
-            Number
-          ),
-        failedRequests:
-          sql<number>`coalesce(sum(case when ${requests.status} = 'failed' then 1 else 0 end), 0)`.mapWith(
-            Number
-          ),
-        rejectedRequests:
-          sql<number>`coalesce(sum(case when ${requests.status} = 'rejected' then 1 else 0 end), 0)`.mapWith(
-            Number
-          ),
-        lastUsedAt: sql<number | null>`max(${requests.createdAt})`,
-      })
-      .from(requests)
-      .where(eq(requests.apiKeyId, apiKeyId))
-      .get(),
-  ]);
-
-  const totalRequests = overview?.totalRequests ?? 0;
-  const requestLimit = apiKey?.requestQuotaLimit ?? null;
-  const lastUsedAt = overview && overview.lastUsedAt !== null ? Number(overview.lastUsedAt) : null;
-
-  return {
-    totalRequests,
-    successRequests: overview?.successRequests ?? 0,
-    failedRequests: overview?.failedRequests ?? 0,
-    rejectedRequests: overview?.rejectedRequests ?? 0,
-    inputTokens: null,
-    outputTokens: null,
-    totalTokens: null,
-    lastUsedAt,
-    quotaLimit: requestLimit,
-    quotaUsed: totalRequests,
-    quotaRemaining: requestLimit === null ? null : Math.max(requestLimit - totalRequests, 0),
-  };
+  return getApiKeyUsageSummaryRow(env, apiKeyId);
 }
 
 export async function listApiKeys(env: WorkerEnv): Promise<ApiKey[]> {

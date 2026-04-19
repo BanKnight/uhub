@@ -150,9 +150,20 @@ async function main() {
         `Unexpected stop_reason: ${JSON.stringify(messageDelta)}`
       );
       assert(
-        typeof messageDelta?.data?.usage?.output_tokens === 'number' &&
-          messageDelta.data.usage.output_tokens > 0,
-        `Unexpected usage payload: ${JSON.stringify(messageDelta)}`
+        messageStart?.data?.message?.usage?.input_tokens === null,
+        `Unexpected message_start usage: ${JSON.stringify(messageStart)}`
+      );
+      assert(
+        messageStart?.data?.message?.usage?.output_tokens === null,
+        `Unexpected message_start usage: ${JSON.stringify(messageStart)}`
+      );
+      assert(
+        messageDelta?.data?.usage?.input_tokens === null,
+        `Unexpected message_delta usage: ${JSON.stringify(messageDelta)}`
+      );
+      assert(
+        messageDelta?.data?.usage?.output_tokens === null,
+        `Unexpected message_delta usage: ${JSON.stringify(messageDelta)}`
       );
 
       console.log(

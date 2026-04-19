@@ -2,6 +2,13 @@ import type { GatewayEndpoint, GatewayFailureClass, GatewayRequestStatus } from 
 import type { WorkerEnv } from '../../index';
 import { createRequestRecord, finishRequestRecord } from '../../repositories/requests-repo';
 
+export type RequestTokenUsage = {
+  inputTokens: number | null;
+  outputTokens: number | null;
+  totalTokens: number | null;
+  tokenUsageAvailability: 'available' | 'unavailable';
+};
+
 export type RequestLogStartInput = {
   apiKeyId: string;
   endpoint: GatewayEndpoint;
@@ -20,6 +27,7 @@ export type RequestLogFinishInput = {
   httpStatus: number | null;
   responseBody: string | null;
   responseSize?: number | null;
+  usage?: RequestTokenUsage | null;
 };
 
 export function getTraceId(request: Request) {
@@ -50,5 +58,6 @@ export function finishRequestLog(env: WorkerEnv, input: RequestLogFinishInput) {
     httpStatus: input.httpStatus,
     latencyMs: Date.now() - input.startedAt,
     responseSize: input.responseSize ?? getBodySize(input.responseBody),
+    usage: input.usage ?? null,
   });
 }

@@ -6,7 +6,7 @@ import {
   type GatewayChannel,
   listActiveGatewayChannels,
   markGatewayChannelHealthy,
-  markGatewayChannelUnhealthy,
+  markGatewayChannelUnhealthyForEnv,
   prioritizeGatewayChannels,
 } from '../../services/gateway/channels';
 import {
@@ -14,6 +14,7 @@ import {
   getTraceId,
   startRequestLog,
 } from '../../services/request-log/request-log';
+import { toRequestTokenUsage } from '../../repositories/requests-repo';
 import {
   createGatewayAbortSignal,
   createGatewayErrorResponse,
@@ -70,6 +71,77 @@ function shouldContinueToNextChannel(failure: AttemptFailure, hasMoreChannels: b
     typeof failure.upstreamStatus === 'number' &&
     isRetriableUpstreamStatus(failure.upstreamStatus)
   );
+}
+
+function resolveGatewayTimeoutMs(rawValue: string | undefined) {
+  if (!rawValue) {
+    return undefined;
+  }
+
+  const parsed = Number(rawValue);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function resolveUsageNumber(value: unknown) {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null;
+}
+
+function extractUsageFromChatCompletionsResponse(responseBody: string) {
+  try {
+    const parsed = JSON.parse(responseBody) as {
+      usage?: {
+        prompt_tokens?: unknown;
+        completion_tokens?: unknown;
+        total_tokens?: unknown;
+      };
+    };
+
+    return toRequestTokenUsage({
+      inputTokens: resolveUsageNumber(parsed?.usage?.prompt_tokens),
+      outputTokens: resolveUsageNumber(parsed?.usage?.completion_tokens),
+      totalTokens: resolveUsageNumber(parsed?.usage?.total_tokens),
+    });
+  } catch {
+    return toRequestTokenUsage(null);
+  }
+}
+
+function readSseDataBlock(block: string) {
+  const lines = block
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .filter((line) => line.startsWith('data:'))
+    .map((line) => line.slice('data:'.length).trimStart());
+
+  if (lines.length === 0) {
+    return null;
+  }
+
+  return lines.join('\n');
+}
+
+function extractUsageFromChatCompletionsStreamPayload(data: string) {
+  if (data === '[DONE]') {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(data) as {
+      usage?: {
+        prompt_tokens?: unknown;
+        completion_tokens?: unknown;
+        total_tokens?: unknown;
+      };
+    };
+
+    return toRequestTokenUsage({
+      inputTokens: resolveUsageNumber(parsed?.usage?.prompt_tokens),
+      outputTokens: resolveUsageNumber(parsed?.usage?.completion_tokens),
+      totalTokens: resolveUsageNumber(parsed?.usage?.total_tokens),
+    });
+  } catch {
+    return null;
+  }
 }
 
 export async function proxyGatewayRequest(input: ProxyGatewayRequestInput) {
@@ -132,7 +204,9 @@ export async function proxyGatewayRequest(input: ProxyGatewayRequestInput) {
               'x-trace-id': traceId,
             },
             body: input.rawBody,
-            signal: createGatewayAbortSignal(),
+            signal: createGatewayAbortSignal(
+              resolveGatewayTimeoutMs(input.c.env.GATEWAY_TIMEOUT_MS)
+            ),
           }
         );
 
@@ -151,7 +225,7 @@ export async function proxyGatewayRequest(input: ProxyGatewayRequestInput) {
           };
 
           if (isRetriableUpstreamStatus(upstreamResponse.status)) {
-            markGatewayChannelUnhealthy(channel.id);
+            markGatewayChannelUnhealthyForEnv(input.c.env, channel.id);
           }
 
           lastFailure = failure;
@@ -184,6 +258,9 @@ export async function proxyGatewayRequest(input: ProxyGatewayRequestInput) {
 
         if (isStream && upstreamResponse.body) {
           let streamedBytes = 0;
+          let buffered = '';
+          let streamUsage = toRequestTokenUsage(null);
+          const decoder = new TextDecoder();
           const requestLogSnapshot = requestLog;
           const leaseSnapshot = concurrencyLease;
           const leaseApiKeyIdSnapshot = leaseApiKeyId;
@@ -200,6 +277,31 @@ export async function proxyGatewayRequest(input: ProxyGatewayRequestInput) {
                     break;
                   }
                   streamedBytes += value?.byteLength ?? 0;
+                  buffered += decoder.decode(value, { stream: true });
+
+                  while (true) {
+                    const separatorIndex = buffered.indexOf('\n\n');
+                    if (separatorIndex === -1) {
+                      break;
+                    }
+
+                    const block = buffered.slice(0, separatorIndex);
+                    buffered = buffered.slice(separatorIndex + 2);
+                    const data = readSseDataBlock(block);
+                    const usage = data ? extractUsageFromChatCompletionsStreamPayload(data) : null;
+                    if (usage) {
+                      streamUsage = usage;
+                    }
+                  }
+                }
+
+                buffered += decoder.decode();
+                if (buffered.trim()) {
+                  const data = readSseDataBlock(buffered);
+                  const usage = data ? extractUsageFromChatCompletionsStreamPayload(data) : null;
+                  if (usage) {
+                    streamUsage = usage;
+                  }
                 }
 
                 await finishRequestLog(input.c.env, {
@@ -211,9 +313,10 @@ export async function proxyGatewayRequest(input: ProxyGatewayRequestInput) {
                   httpStatus: upstreamResponse.status,
                   responseBody: null,
                   responseSize: streamedBytes,
+                  usage: streamUsage,
                 });
               } catch (error) {
-                markGatewayChannelUnhealthy(channel.id);
+                markGatewayChannelUnhealthyForEnv(input.c.env, channel.id);
                 await finishRequestLog(input.c.env, {
                   id: requestLogSnapshot.id,
                   startedAt: requestLogSnapshot.startedAt,
@@ -265,6 +368,7 @@ export async function proxyGatewayRequest(input: ProxyGatewayRequestInput) {
           channelId: channel.id,
           httpStatus: upstreamResponse.status,
           responseBody,
+          usage: extractUsageFromChatCompletionsResponse(responseBody),
         });
 
         if (input.onSuccess) {
@@ -288,7 +392,7 @@ export async function proxyGatewayRequest(input: ProxyGatewayRequestInput) {
           responseBody: null,
         };
 
-        markGatewayChannelUnhealthy(channel.id);
+        markGatewayChannelUnhealthyForEnv(input.c.env, channel.id);
         lastFailure = failure;
 
         if (shouldContinueToNextChannel(failure, index < prioritizedChannels.length - 1)) {

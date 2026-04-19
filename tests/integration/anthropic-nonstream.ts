@@ -93,14 +93,8 @@ async function main() {
         json?.stop_sequence === STOP_SEQUENCE,
         `Unexpected stop_sequence: ${json?.stop_sequence}`
       );
-      assert(
-        typeof json?.usage?.input_tokens === 'number' && json.usage.input_tokens > 0,
-        'input_tokens should be > 0'
-      );
-      assert(
-        typeof json?.usage?.output_tokens === 'number' && json.usage.output_tokens > 0,
-        'output_tokens should be > 0'
-      );
+      assert(json?.usage?.input_tokens === null, `Unexpected usage: ${JSON.stringify(json)}`);
+      assert(json?.usage?.output_tokens === null, `Unexpected usage: ${JSON.stringify(json)}`);
 
       console.log(
         JSON.stringify(

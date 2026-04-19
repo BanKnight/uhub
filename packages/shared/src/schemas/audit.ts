@@ -4,6 +4,7 @@ import {
   gatewayFailureClassSchema,
   gatewayRequestStatusSchema,
 } from './gateway';
+import { requestTokenUsageAvailabilitySchema } from './api-keys';
 
 export const auditRequestItemSchema = z.object({
   id: z.string(),
@@ -19,6 +20,10 @@ export const auditRequestItemSchema = z.object({
   failureClass: gatewayFailureClassSchema.nullable(),
   httpStatus: z.number().int().nullable(),
   latencyMs: z.number().int().nullable(),
+  inputTokens: z.number().int().nonnegative().nullable(),
+  outputTokens: z.number().int().nonnegative().nullable(),
+  totalTokens: z.number().int().nonnegative().nullable(),
+  tokenUsageAvailability: requestTokenUsageAvailabilitySchema,
   createdAt: z.number().int(),
 });
 

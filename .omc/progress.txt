@@ -199,3 +199,32 @@
 - 当前建议执行顺序已更新为：Phase 1 冻结 openai/anthropic/gemini 三协议最小抽象与 canonical usage contract；Phase 2 重组 integration/e2e/CI；Phase 3 落 Gemini 最小协议入口；Phase 4 补 portal 份额/使用情况与 admin 结构化模型配置；Phase 5 升级 CI 为三协议 contract matrix + 最小 e2e。
 - 已新增 OMC 计划文件：`/data/workspace/uhub/.omc/plans/2026-04-18-axonhub-gap-alignment-plan.md`。
 - 当前待做：如继续扩展，应优先补 Gemini stream / token usage 真值，再考虑更完整的 admin provider/model 结构化配置，而不是回头继续堆 Anthropic 细碎兼容。
+
+### Phase 1（Gemini stream 生命周期闭环）
+- `apps/api-worker/src/routers/gateway/gemini-contents.ts` 补齐 `:streamGenerateContent` 路径，并将 Gemini stream 响应翻译为 SSE；happy path、读流中断、upstream timeout 三类场景都进入集成验证。
+- `apps/api-worker/src/routers/gateway/proxy-request.ts` 统一改为用 env 驱动 timeout 与 channel unhealthy cooldown；stream 读流失败、5xx、网络错误都通过 `markGatewayChannelUnhealthyForEnv()` 落入同一 cooldown 语义。
+- `apps/api-worker/src/services/gateway/channels.ts` 增加 `markGatewayChannelUnhealthyForEnv()`，支持从 `GATEWAY_CHANNEL_UNHEALTHY_COOLDOWN_MS` 读取短 cooldown，便于稳定复跑生命周期测试。
+- `packages/shared/src/schemas/gateway.ts` 为 chat completions response 增加可选 `usage` schema；Gemini non-stream 翻译改为“有真实 usage 就透传，没有就返回 null”，删除估算 token 的伪真值路径。
+- `tests/integration/gemini-stream.ts` 扩成三场景：happy path、interrupted-stream、upstream-timeout；`tests/integration/gemini-nonstream.ts` 改为断言 `usageMetadata` 为 null。
+- `.github/workflows/ci.yml` 的 quality matrix worker 启动命令统一注入 `GATEWAY_TIMEOUT_MS:1000` 和 `GATEWAY_CHANNEL_UNHEALTHY_COOLDOWN_MS:1000`，让 Gemini stream 生命周期场景在 CI 中可稳定快速复跑。
+- 运行验证：
+  - `UHUB_ADMIN_EMAIL=ci-admin@example.com UHUB_ADMIN_PASSWORD=ci-admin-password-123 bun run test:integration` 成功
+  - `UHUB_ADMIN_EMAIL=ci-admin@example.com UHUB_ADMIN_PASSWORD=ci-admin-password-123 bun run test:e2e:core` 成功
+  - `bun run check` 成功
+  - 本地默认 integration 失败的直接原因不是 token truth 逻辑回归，而是当前 worker admin 凭据与测试默认 `admin@example.com/admin123456` 不一致；切到 CI 那组 `ci-admin@example.com/ci-admin-password-123` 后，OpenAI/portal/Anthropic 相关窄验证恢复通过
+  - Anthropic stream tool_use / multi-stream tool_use 测试已同步到“usage 真值缺失时返回 null”契约，避免继续断言旧的估算 token 行为
+
+### Phase 2/3 收口（token truth + admin 结构化配置增强）
+- token usage 真值契约已冻结到单一持久层：上游提供 usage 时持久化真实 input/output/total token；缺失 usage 时统一返回 `null/unavailable`，不再写入估算 token。
+- `tests/integration/portal-overview-quota.ts` 已验证 portal overview 的 quota/token 读取口径与后端契约一致，语义上继续区分 quota 与 token usage。
+- `apps/admin-web/src/app.tsx` 已补齐 channel 的结构化 create/edit/status 流程，围绕 `provider/protocol/baseUrl/models/status` 工作，并继续兼容 legacy `configJson` 展示。
+- `tests/integration/_anthropic.ts` 新增 `listChannels()`、`updateChannel()`、`updateChannelStatus()`，供 admin 结构化回归复用。
+- 新增 `tests/integration/admin-channel-structured.ts`，覆盖 channel 的 create -> list -> update(disabled) -> list -> status(active) -> list 闭环，验证结构化字段与兼容读取路径。
+- 根 `package.json` 新增 `test:integration:admin:channel-structured`，并收口到 `test:integration:openai`，让 admin 结构化回归进入统一 integration 入口。
+- `packages/shared/package.json` 已补上 `main/module/types/exports` 指向 `dist/index.*`，修复 admin-web 开始 runtime import `@uhub/shared` 后暴露的 Vite resolver 问题。
+- 最新验证结果：
+  - `bun tests/integration/admin-channel-structured.ts` 返回 `status: ok`，并确认 channel 从 `active -> disabled -> active` 变化正确
+  - `bun tests/integration/portal-overview-quota.ts` 返回真实 token/quota 数据（`inputTokens=9`、`outputTokens=4`、`totalTokens=13`、`tokenUsageAvailability=available`）
+  - `bun run format:check && bun run lint && bun run typecheck && bun run build` 成功
+
+

@@ -2,7 +2,7 @@ import { inArray } from 'drizzle-orm';
 import { channels, getDb } from '../../db/schema';
 import type { WorkerEnv } from '../../index';
 
-const CHANNEL_UNHEALTHY_COOLDOWN_MS = 30_000;
+const DEFAULT_CHANNEL_UNHEALTHY_COOLDOWN_MS = 30_000;
 const channelUnhealthyUntil = new Map<string, number>();
 
 export type GatewayChannel = {
@@ -11,6 +11,15 @@ export type GatewayChannel = {
   provider: string;
   baseUrl: string;
 };
+
+function resolveChannelCooldownMs(rawValue: string | undefined, fallback: number) {
+  if (!rawValue) {
+    return fallback;
+  }
+
+  const parsed = Number(rawValue);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
 
 function isChannelCoolingDown(channelId: string, now = Date.now()) {
   const unhealthyUntil = channelUnhealthyUntil.get(channelId);
@@ -33,9 +42,20 @@ export function markGatewayChannelHealthy(channelId: string) {
 
 export function markGatewayChannelUnhealthy(
   channelId: string,
-  cooldownMs = CHANNEL_UNHEALTHY_COOLDOWN_MS
+  cooldownMs = DEFAULT_CHANNEL_UNHEALTHY_COOLDOWN_MS
 ) {
   channelUnhealthyUntil.set(channelId, Date.now() + cooldownMs);
+}
+
+export function markGatewayChannelUnhealthyForEnv(
+  env: Pick<WorkerEnv, 'GATEWAY_CHANNEL_UNHEALTHY_COOLDOWN_MS'>,
+  channelId: string,
+  cooldownMs = DEFAULT_CHANNEL_UNHEALTHY_COOLDOWN_MS
+) {
+  markGatewayChannelUnhealthy(
+    channelId,
+    resolveChannelCooldownMs(env.GATEWAY_CHANNEL_UNHEALTHY_COOLDOWN_MS, cooldownMs)
+  );
 }
 
 export async function listActiveGatewayChannels(
