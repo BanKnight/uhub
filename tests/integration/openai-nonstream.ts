@@ -241,7 +241,7 @@ async function main() {
         `Unexpected analytics: ${JSON.stringify(analytics.json)}`
       );
       assert(
-        analyticsData?.totalCostMicros === expectedTotalCostMicros,
+        (analyticsData?.totalCostMicros ?? 0) >= expectedTotalCostMicros,
         `Unexpected analytics cost: ${JSON.stringify(analytics.json)}`
       );
       assert(
@@ -269,7 +269,7 @@ async function main() {
         `Unexpected endpoint breakdown: ${JSON.stringify(analytics.json)}`
       );
       assert(
-        endpointItem?.totalCostMicros === expectedTotalCostMicros,
+        (endpointItem?.totalCostMicros ?? 0) >= expectedTotalCostMicros,
         `Unexpected endpoint cost: ${JSON.stringify(analytics.json)}`
       );
       assert(

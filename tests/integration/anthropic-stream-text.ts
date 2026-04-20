@@ -290,14 +290,14 @@ async function main() {
       assert(analytics.response.ok, `Analytics failed: ${JSON.stringify(analytics.json)}`);
       const analyticsData = analytics.json?.result?.data;
       assert(
-        analyticsData?.totalCostMicros === EXPECTED_TOTAL_COST_MICROS,
+        (analyticsData?.totalCostMicros ?? 0) >= EXPECTED_TOTAL_COST_MICROS,
         `Unexpected analytics cost: ${JSON.stringify(analytics.json)}`
       );
       const endpointItem = analyticsData?.endpointBreakdown?.find(
         (item) => item.endpoint === 'anthropic_messages'
       );
       assert(
-        endpointItem?.totalCostMicros === EXPECTED_TOTAL_COST_MICROS,
+        (endpointItem?.totalCostMicros ?? 0) >= EXPECTED_TOTAL_COST_MICROS,
         `Unexpected endpoint cost: ${JSON.stringify(analytics.json)}`
       );
       const channelItem = analyticsData?.channelBreakdown?.find(

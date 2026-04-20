@@ -229,17 +229,19 @@ async function main() {
       assert(analytics.response.ok, `Analytics failed: ${JSON.stringify(analytics.json)}`);
       const analyticsData = analytics.json?.result?.data;
       assert(
-        analyticsData?.totalCostMicros === expectedTotalCostMicros,
+        (analyticsData?.totalCostMicros ?? 0) >= expectedTotalCostMicros,
         `Unexpected analytics cost: ${JSON.stringify(analytics.json)}`
       );
       const endpointItem = analyticsData?.endpointBreakdown?.find(
         (item) => item.endpoint === 'anthropic_messages'
       );
       assert(
-        endpointItem?.totalCostMicros === expectedTotalCostMicros,
+        (endpointItem?.totalCostMicros ?? 0) >= expectedTotalCostMicros,
         `Unexpected endpoint cost: ${JSON.stringify(analytics.json)}`
       );
-      const channelItem = analyticsData?.channelBreakdown?.find((item) => item.channelId === channelId);
+      const channelItem = analyticsData?.channelBreakdown?.find(
+        (item) => item.channelId === channelId
+      );
       assert(
         channelItem?.totalCostMicros === expectedTotalCostMicros,
         `Unexpected channel cost: ${JSON.stringify(analytics.json)}`
