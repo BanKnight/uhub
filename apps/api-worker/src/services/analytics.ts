@@ -28,6 +28,7 @@ const unavailableCountExpr =
 const inputTokensExpr = sql<number | null>`sum(${requests.inputTokens})`;
 const outputTokensExpr = sql<number | null>`sum(${requests.outputTokens})`;
 const totalTokensExpr = sql<number | null>`sum(${requests.totalTokens})`;
+const totalCostMicrosExpr = sql<number | null>`sum(${requests.totalCostMicros})`;
 
 type AnalyticsTokenAggregateRow = {
   availableCount: number;
@@ -35,6 +36,7 @@ type AnalyticsTokenAggregateRow = {
   inputTokens: number | null;
   outputTokens: number | null;
   totalTokens: number | null;
+  totalCostMicros: number | null;
 };
 
 function toNullableNumber(value: number | null) {
@@ -66,6 +68,7 @@ function toAnalyticsTokenSummary(row: AnalyticsTokenAggregateRow) {
     inputTokens: row.availableCount > 0 ? (toNullableNumber(row.inputTokens) ?? 0) : null,
     outputTokens: row.availableCount > 0 ? (toNullableNumber(row.outputTokens) ?? 0) : null,
     totalTokens: row.availableCount > 0 ? (toNullableNumber(row.totalTokens) ?? 0) : null,
+    totalCostMicros: toNullableNumber(row.totalCostMicros),
     tokenUsageAvailability: toSummaryTokenUsageAvailability(row),
   };
 }
@@ -85,6 +88,7 @@ async function listEndpointAnalytics(env: WorkerEnv): Promise<EndpointAnalyticsI
       inputTokens: inputTokensExpr,
       outputTokens: outputTokensExpr,
       totalTokens: totalTokensExpr,
+      totalCostMicros: totalCostMicrosExpr,
     })
     .from(requests)
     .groupBy(requests.endpoint)
@@ -119,6 +123,7 @@ async function listChannelAnalytics(env: WorkerEnv): Promise<ChannelAnalyticsIte
       inputTokens: inputTokensExpr,
       outputTokens: outputTokensExpr,
       totalTokens: totalTokensExpr,
+      totalCostMicros: totalCostMicrosExpr,
     })
     .from(requests)
     .leftJoin(channels, eq(requests.channelId, channels.id))
@@ -154,6 +159,7 @@ export async function getAnalyticsSummary(env: WorkerEnv): Promise<AnalyticsSumm
       inputTokens: inputTokensExpr,
       outputTokens: outputTokensExpr,
       totalTokens: totalTokensExpr,
+      totalCostMicros: totalCostMicrosExpr,
     })
     .from(requests);
   const [endpointBreakdown, channelBreakdown] = await Promise.all([
@@ -169,6 +175,7 @@ export async function getAnalyticsSummary(env: WorkerEnv): Promise<AnalyticsSumm
     inputTokens: overview?.inputTokens ?? null,
     outputTokens: overview?.outputTokens ?? null,
     totalTokens: overview?.totalTokens ?? null,
+    totalCostMicros: overview?.totalCostMicros ?? null,
   });
 
   return {

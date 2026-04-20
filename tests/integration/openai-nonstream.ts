@@ -46,6 +46,8 @@ async function exchangePortal(rawKey: string) {
 }
 
 async function main() {
+  const expectedTotalCostMicros = 6;
+
   await withMockJsonUpstream(
     (body) => {
       const parsed = JSON.parse(body);
@@ -137,6 +139,14 @@ async function main() {
         `Unexpected overview: ${JSON.stringify(overview.json)}`
       );
       assert(
+        overview.json?.usage?.totalCostMicros === expectedTotalCostMicros,
+        `Unexpected overview cost: ${JSON.stringify(overview.json)}`
+      );
+      assert(
+        overview.json?.usage?.cost?.totalCostMicros === expectedTotalCostMicros,
+        `Unexpected overview nested cost: ${JSON.stringify(overview.json)}`
+      );
+      assert(
         overview.json?.usage?.tokens?.tokenUsageAvailability === 'available',
         `Unexpected overview availability: ${JSON.stringify(overview.json)}`
       );
@@ -172,6 +182,10 @@ async function main() {
         `Unexpected history item: ${JSON.stringify(history.json)}`
       );
       assert(
+        history.json[0]?.totalCostMicros === expectedTotalCostMicros,
+        `Unexpected history cost: ${JSON.stringify(history.json)}`
+      );
+      assert(
         history.json[0]?.tokenUsageAvailability === 'available',
         `Unexpected history availability: ${JSON.stringify(history.json)}`
       );
@@ -199,6 +213,10 @@ async function main() {
       assert(auditItem?.outputTokens === 7, `Unexpected audit item: ${JSON.stringify(audit.json)}`);
       assert(auditItem?.totalTokens === 18, `Unexpected audit item: ${JSON.stringify(audit.json)}`);
       assert(
+        auditItem?.totalCostMicros === expectedTotalCostMicros,
+        `Unexpected audit cost: ${JSON.stringify(audit.json)}`
+      );
+      assert(
         auditItem?.tokenUsageAvailability === 'available',
         `Unexpected audit availability: ${JSON.stringify(audit.json)}`
       );
@@ -221,6 +239,10 @@ async function main() {
       assert(
         analyticsData?.totalTokens === 18,
         `Unexpected analytics: ${JSON.stringify(analytics.json)}`
+      );
+      assert(
+        analyticsData?.totalCostMicros === expectedTotalCostMicros,
+        `Unexpected analytics cost: ${JSON.stringify(analytics.json)}`
       );
       assert(
         analyticsData?.tokenUsageAvailability === 'available',
@@ -247,6 +269,10 @@ async function main() {
         `Unexpected endpoint breakdown: ${JSON.stringify(analytics.json)}`
       );
       assert(
+        endpointItem?.totalCostMicros === expectedTotalCostMicros,
+        `Unexpected endpoint cost: ${JSON.stringify(analytics.json)}`
+      );
+      assert(
         endpointItem?.tokenUsageAvailability === 'available',
         `Unexpected endpoint availability: ${JSON.stringify(analytics.json)}`
       );
@@ -264,6 +290,10 @@ async function main() {
       assert(
         channelItem?.totalTokens === 18,
         `Unexpected channel breakdown: ${JSON.stringify(analytics.json)}`
+      );
+      assert(
+        channelItem?.totalCostMicros === expectedTotalCostMicros,
+        `Unexpected channel cost: ${JSON.stringify(analytics.json)}`
       );
       assert(
         channelItem?.tokenUsageAvailability === 'available',

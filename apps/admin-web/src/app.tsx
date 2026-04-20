@@ -198,6 +198,7 @@ function AnalyticsSection({ analytics }: { analytics: AnalyticsSummary }) {
         <li>Input tokens: {formatNullableMetric(analytics.inputTokens)}</li>
         <li>Output tokens: {formatNullableMetric(analytics.outputTokens)}</li>
         <li>Total tokens: {formatNullableMetric(analytics.totalTokens)}</li>
+        <li>Total cost (micros USD): {formatNullableMetric(analytics.totalCostMicros)}</li>
         <li>Token availability: {analytics.tokenUsageAvailability}</li>
       </ul>
 
@@ -219,6 +220,7 @@ function AnalyticsSection({ analytics }: { analytics: AnalyticsSummary }) {
             <div>Input tokens: {formatNullableMetric(item.inputTokens)}</div>
             <div>Output tokens: {formatNullableMetric(item.outputTokens)}</div>
             <div>Total tokens: {formatNullableMetric(item.totalTokens)}</div>
+            <div>Total cost (micros USD): {formatNullableMetric(item.totalCostMicros)}</div>
             <div>Token availability: {item.tokenUsageAvailability}</div>
           </li>
         ))}
@@ -244,6 +246,7 @@ function AnalyticsSection({ analytics }: { analytics: AnalyticsSummary }) {
             <div>Input tokens: {formatNullableMetric(item.inputTokens)}</div>
             <div>Output tokens: {formatNullableMetric(item.outputTokens)}</div>
             <div>Total tokens: {formatNullableMetric(item.totalTokens)}</div>
+            <div>Total cost (micros USD): {formatNullableMetric(item.totalCostMicros)}</div>
             <div>Token availability: {item.tokenUsageAvailability}</div>
           </li>
         ))}
@@ -357,6 +360,7 @@ function AuditSection({
             <div>Input tokens: {formatNullableMetric(item.inputTokens)}</div>
             <div>Output tokens: {formatNullableMetric(item.outputTokens)}</div>
             <div>Total tokens: {formatNullableMetric(item.totalTokens)}</div>
+            <div>Total cost (micros USD): {formatNullableMetric(item.totalCostMicros)}</div>
             <div>Token availability: {item.tokenUsageAvailability}</div>
             <div>Created: {new Date(item.createdAt).toISOString()}</div>
           </li>

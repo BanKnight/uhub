@@ -10,6 +10,7 @@ export const endpointRuleSchema = z.enum([
 
 const usageCountSchema = z.number().int().nonnegative();
 const nullableUsageMetricSchema = z.number().nullable();
+const nullableCostMetricSchema = z.number().int().nonnegative().nullable();
 export const requestTokenUsageAvailabilitySchema = z.enum(['available', 'unavailable']);
 export const summaryTokenUsageAvailabilitySchema = z.enum(['available', 'partial', 'unavailable']);
 
@@ -22,6 +23,10 @@ export const tokenUsageSchema = z.object({
   outputTokens: nullableUsageMetricSchema,
   totalTokens: nullableUsageMetricSchema,
   tokenUsageAvailability: summaryTokenUsageAvailabilitySchema,
+});
+
+export const costUsageSchema = z.object({
+  totalCostMicros: nullableCostMetricSchema,
 });
 
 export const requestQuotaUsageSchema = z.object({
@@ -38,12 +43,14 @@ export const apiKeyUsageSummarySchema = z.object({
   inputTokens: nullableUsageMetricSchema,
   outputTokens: nullableUsageMetricSchema,
   totalTokens: nullableUsageMetricSchema,
+  totalCostMicros: nullableCostMetricSchema,
   tokenUsageAvailability: summaryTokenUsageAvailabilitySchema,
   lastUsedAt: z.number().nullable(),
   quotaLimit: nullableUsageMetricSchema,
   quotaUsed: nullableUsageMetricSchema,
   quotaRemaining: nullableUsageMetricSchema,
   tokens: tokenUsageSchema,
+  cost: costUsageSchema,
   quota: requestQuotaUsageSchema,
 });
 
@@ -106,6 +113,7 @@ export const portalExchangeResultSchema = z.object({
 
 export type ApiKeyQuota = z.infer<typeof apiKeyQuotaSchema>;
 export type TokenUsage = z.infer<typeof tokenUsageSchema>;
+export type CostUsage = z.infer<typeof costUsageSchema>;
 export type RequestQuotaUsage = z.infer<typeof requestQuotaUsageSchema>;
 export type ApiKeyUsageSummary = z.infer<typeof apiKeyUsageSummarySchema>;
 export type ApiKeyChannelSummary = z.infer<typeof apiKeyChannelSummarySchema>;

@@ -145,6 +145,10 @@ function App() {
                   <li>Input tokens: {formatNullableMetric(overview.usage.tokens.inputTokens)}</li>
                   <li>Output tokens: {formatNullableMetric(overview.usage.tokens.outputTokens)}</li>
                   <li>Total tokens: {formatNullableMetric(overview.usage.tokens.totalTokens)}</li>
+                  <li>
+                    Total cost (micros USD):{' '}
+                    {formatNullableMetric(overview.usage.cost.totalCostMicros)}
+                  </li>
                   <li>Token availability: {overview.usage.tokens.tokenUsageAvailability}</li>
                   <li>Last used at: {formatNullableTimestamp(overview.usage.lastUsedAt)}</li>
                   <li>Quota limit: {formatNullableMetric(overview.usage.quota.quotaLimit)}</li>
@@ -175,6 +179,9 @@ function App() {
                     <div>Input tokens: {formatNullableMetric(request.inputTokens)}</div>
                     <div>Output tokens: {formatNullableMetric(request.outputTokens)}</div>
                     <div>Total tokens: {formatNullableMetric(request.totalTokens)}</div>
+                    <div>
+                      Total cost (micros USD): {formatNullableMetric(request.totalCostMicros)}
+                    </div>
                     <div>Token availability: {request.tokenUsageAvailability}</div>
                     <div>Created: {new Date(request.createdAt).toISOString()}</div>
                   </li>

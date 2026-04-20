@@ -12,6 +12,36 @@ import { apiKeys, channels, getDb, requests } from '../db/schema';
 import type { WorkerEnv } from '../index';
 import type { RequestTokenUsage } from '../services/request-log/request-log';
 
+const MODEL_PRICING_USD_PER_MILLION_TOKENS = {
+  'gpt-4o-mini': {
+    input: 0.15,
+    output: 0.6,
+  },
+  'claude-3-5-sonnet': {
+    input: 3,
+    output: 15,
+  },
+  'claude-3-5-sonnet-latest': {
+    input: 3,
+    output: 15,
+  },
+  'claude-3-5-sonnet-20241022': {
+    input: 3,
+    output: 15,
+  },
+  'claude-3-5-sonnet-20240620': {
+    input: 3,
+    output: 15,
+  },
+  'gemini-2.5-flash': {
+    input: 0.3,
+    output: 2.5,
+  },
+} as const;
+
+type ModelPricing =
+  (typeof MODEL_PRICING_USD_PER_MILLION_TOKENS)[keyof typeof MODEL_PRICING_USD_PER_MILLION_TOKENS];
+
 type CreateRequestRecordInput = {
   apiKeyId: string;
   endpoint: GatewayEndpoint;
@@ -38,6 +68,7 @@ type TokenUsageAggregateRow = {
   inputTokens: number | null;
   outputTokens: number | null;
   totalTokens: number | null;
+  totalCostMicros: number | null;
 };
 
 type RequestHistoryRow = {
@@ -57,11 +88,33 @@ type RequestHistoryRow = {
   inputTokens: number | null;
   outputTokens: number | null;
   totalTokens: number | null;
+  totalCostMicros: number | null;
   tokenUsageAvailability: RequestHistoryItem['tokenUsageAvailability'];
   startedAt: number;
   finishedAt: number | null;
   createdAt: number;
 };
+
+function toPricingMicros(inputTokens: number, outputTokens: number, pricing: ModelPricing) {
+  return Math.round(inputTokens * pricing.input + outputTokens * pricing.output);
+}
+
+function toTotalCostMicros(model: string | null, usage: RequestTokenUsage) {
+  if (model === null || usage.tokenUsageAvailability !== 'available') {
+    return null;
+  }
+
+  const pricing =
+    MODEL_PRICING_USD_PER_MILLION_TOKENS[
+      model as keyof typeof MODEL_PRICING_USD_PER_MILLION_TOKENS
+    ];
+
+  if (!pricing || usage.inputTokens === null || usage.outputTokens === null) {
+    return null;
+  }
+
+  return toPricingMicros(usage.inputTokens, usage.outputTokens, pricing);
+}
 
 function toSummaryTokenUsageAvailability(row: TokenUsageAggregateRow) {
   if (row.availableCount === 0) {
@@ -116,6 +169,7 @@ function mapRequestRowToHistoryItem(row: RequestHistoryRow): RequestHistoryItem 
     inputTokens: row.inputTokens ?? null,
     outputTokens: row.outputTokens ?? null,
     totalTokens: row.totalTokens ?? null,
+    totalCostMicros: row.totalCostMicros ?? null,
     tokenUsageAvailability: row.tokenUsageAvailability,
     startedAt: row.startedAt,
     finishedAt: row.finishedAt ?? null,
@@ -138,6 +192,8 @@ function toApiKeyUsageSummary(input: {
     input.tokenUsage.availableCount > 0 ? (input.tokenUsage.outputTokens ?? 0) : null;
   const totalTokens =
     input.tokenUsage.availableCount > 0 ? (input.tokenUsage.totalTokens ?? 0) : null;
+  const totalCostMicros =
+    input.tokenUsage.totalCostMicros === null ? null : Number(input.tokenUsage.totalCostMicros);
   const tokenUsageAvailability = toSummaryTokenUsageAvailability(input.tokenUsage);
   const quotaLimit = input.requestLimit;
   const quotaUsed = input.totalRequests;
@@ -152,6 +208,7 @@ function toApiKeyUsageSummary(input: {
     inputTokens,
     outputTokens,
     totalTokens,
+    totalCostMicros,
     tokenUsageAvailability,
     lastUsedAt: input.lastUsedAt,
     quotaLimit,
@@ -162,6 +219,9 @@ function toApiKeyUsageSummary(input: {
       outputTokens,
       totalTokens,
       tokenUsageAvailability,
+    },
+    cost: {
+      totalCostMicros,
     },
     quota: {
       quotaLimit,
@@ -189,6 +249,7 @@ async function getTokenUsageAggregate(
       inputTokens: sql<number | null>`sum(${requests.inputTokens})`,
       outputTokens: sql<number | null>`sum(${requests.outputTokens})`,
       totalTokens: sql<number | null>`sum(${requests.totalTokens})`,
+      totalCostMicros: sql<number | null>`sum(${requests.totalCostMicros})`,
     })
     .from(requests)
     .where(eq(requests.apiKeyId, apiKeyId))
@@ -200,6 +261,7 @@ async function getTokenUsageAggregate(
     inputTokens: row?.inputTokens === null ? null : Number(row?.inputTokens),
     outputTokens: row?.outputTokens === null ? null : Number(row?.outputTokens),
     totalTokens: row?.totalTokens === null ? null : Number(row?.totalTokens),
+    totalCostMicros: row?.totalCostMicros === null ? null : Number(row?.totalCostMicros),
   };
 }
 
@@ -224,6 +286,7 @@ export async function createRequestRecord(env: WorkerEnv, input: CreateRequestRe
     inputTokens: null,
     outputTokens: null,
     totalTokens: null,
+    totalCostMicros: null,
     tokenUsageAvailability: 'unavailable',
     payloadRef: null,
     startedAt: now,
@@ -264,6 +327,7 @@ export async function listRequestsByApiKey(
       inputTokens: requests.inputTokens,
       outputTokens: requests.outputTokens,
       totalTokens: requests.totalTokens,
+      totalCostMicros: requests.totalCostMicros,
       tokenUsageAvailability: requests.tokenUsageAvailability,
       startedAt: requests.startedAt,
       finishedAt: requests.finishedAt,
@@ -309,6 +373,7 @@ export async function listRecentRequestsForAdmin(
       inputTokens: requests.inputTokens,
       outputTokens: requests.outputTokens,
       totalTokens: requests.totalTokens,
+      totalCostMicros: requests.totalCostMicros,
       tokenUsageAvailability: requests.tokenUsageAvailability,
       createdAt: requests.createdAt,
     })
@@ -337,6 +402,7 @@ export async function listRecentRequestsForAdmin(
     inputTokens: row.inputTokens ?? null,
     outputTokens: row.outputTokens ?? null,
     totalTokens: row.totalTokens ?? null,
+    totalCostMicros: row.totalCostMicros ?? null,
     tokenUsageAvailability: row.tokenUsageAvailability,
     createdAt: row.createdAt,
   }));
@@ -391,6 +457,14 @@ export async function finishRequestRecord(env: WorkerEnv, input: FinishRequestRe
   const db = getDb(env);
   const finishedAt = Date.now();
   const usage = input.usage ?? toRequestTokenUsage(null);
+  const requestRecord = await db
+    .select({
+      model: requests.model,
+    })
+    .from(requests)
+    .where(eq(requests.id, input.id))
+    .get();
+  const totalCostMicros = toTotalCostMicros(requestRecord?.model ?? null, usage);
 
   await db
     .update(requests)
@@ -404,6 +478,7 @@ export async function finishRequestRecord(env: WorkerEnv, input: FinishRequestRe
       inputTokens: usage.inputTokens,
       outputTokens: usage.outputTokens,
       totalTokens: usage.totalTokens,
+      totalCostMicros,
       tokenUsageAvailability: usage.tokenUsageAvailability,
       finishedAt,
     })

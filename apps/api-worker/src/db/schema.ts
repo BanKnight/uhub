@@ -134,6 +134,7 @@ export const requests = sqliteTable('requests', {
   inputTokens: integer('input_tokens'),
   outputTokens: integer('output_tokens'),
   totalTokens: integer('total_tokens'),
+  totalCostMicros: integer('total_cost_micros'),
   tokenUsageAvailability: text('token_usage_availability', {
     enum: ['available', 'unavailable'],
   }).notNull(),

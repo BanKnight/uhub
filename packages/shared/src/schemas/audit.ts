@@ -25,6 +25,7 @@ export const auditRequestItemSchema = z.object({
   inputTokens: z.number().int().nonnegative().nullable(),
   outputTokens: z.number().int().nonnegative().nullable(),
   totalTokens: z.number().int().nonnegative().nullable(),
+  totalCostMicros: z.number().int().nonnegative().nullable(),
   tokenUsageAvailability: requestTokenUsageAvailabilitySchema,
   createdAt: z.number().int(),
 });

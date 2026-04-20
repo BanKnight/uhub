@@ -228,6 +228,7 @@ export const requestHistoryItemSchema = z.object({
   inputTokens: z.number().int().nonnegative().nullable(),
   outputTokens: z.number().int().nonnegative().nullable(),
   totalTokens: z.number().int().nonnegative().nullable(),
+  totalCostMicros: z.number().int().nonnegative().nullable(),
   tokenUsageAvailability: requestTokenUsageAvailabilitySchema,
   startedAt: z.number().int(),
   finishedAt: z.number().int().nullable(),

@@ -7,6 +7,7 @@ const analyticsCountSchema = z.number().int().nonnegative();
 
 const successRateSchema = z.number().min(0).max(1).nullable();
 const nullableTokenMetricSchema = z.number().int().nonnegative().nullable();
+const nullableCostMetricSchema = z.number().int().nonnegative().nullable();
 
 export const endpointAnalyticsItemSchema = z.object({
   endpoint: gatewayEndpointSchema,
@@ -19,6 +20,7 @@ export const endpointAnalyticsItemSchema = z.object({
   inputTokens: nullableTokenMetricSchema,
   outputTokens: nullableTokenMetricSchema,
   totalTokens: nullableTokenMetricSchema,
+  totalCostMicros: nullableCostMetricSchema,
   tokenUsageAvailability: summaryTokenUsageAvailabilitySchema,
 });
 
@@ -35,6 +37,7 @@ export const channelAnalyticsItemSchema = z.object({
   inputTokens: nullableTokenMetricSchema,
   outputTokens: nullableTokenMetricSchema,
   totalTokens: nullableTokenMetricSchema,
+  totalCostMicros: nullableCostMetricSchema,
   tokenUsageAvailability: summaryTokenUsageAvailabilitySchema,
 });
 
@@ -48,6 +51,7 @@ export const analyticsSummarySchema = z.object({
   inputTokens: nullableTokenMetricSchema,
   outputTokens: nullableTokenMetricSchema,
   totalTokens: nullableTokenMetricSchema,
+  totalCostMicros: nullableCostMetricSchema,
   tokenUsageAvailability: summaryTokenUsageAvailabilitySchema,
   endpointBreakdown: z.array(endpointAnalyticsItemSchema),
   channelBreakdown: z.array(channelAnalyticsItemSchema),
