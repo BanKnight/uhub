@@ -166,7 +166,6 @@ export async function listChannels(cookie: string) {
     baseUrl: string;
     models: string[];
     status: string;
-    configJson: string;
   }>;
 }
 
@@ -209,7 +208,6 @@ export async function updateChannel(
     baseUrl: string;
     models: string[];
     status: string;
-    configJson: string;
   };
 }
 
@@ -242,7 +240,6 @@ export async function updateChannelStatus(
     baseUrl: string;
     models: string[];
     status: string;
-    configJson: string;
   };
 }
 
