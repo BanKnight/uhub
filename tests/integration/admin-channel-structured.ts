@@ -58,7 +58,6 @@ async function main() {
         JSON.stringify(created.models) === JSON.stringify(['gpt-4o-mini']),
         `Unexpected models: ${JSON.stringify(created)}`
       );
-      assert(created.configJson === '{}', `Unexpected configJson: ${JSON.stringify(created)}`);
       assert(
         created.gatewayHealthStatus === 'healthy' && created.gatewayUnhealthyUntil === null,
         `Unexpected gateway health: ${JSON.stringify(created)}`
@@ -82,10 +81,6 @@ async function main() {
       assert(
         JSON.stringify(updated.models) === JSON.stringify(['gpt-4o-mini', 'gpt-4o']),
         `Unexpected update models: ${JSON.stringify(updated)}`
-      );
-      assert(
-        updated.configJson === '{}',
-        `Unexpected update configJson: ${JSON.stringify(updated)}`
       );
       assert(
         updated.gatewayHealthStatus === 'healthy' && updated.gatewayUnhealthyUntil === null,

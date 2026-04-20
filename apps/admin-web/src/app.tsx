@@ -647,9 +647,9 @@ function ChannelsPage() {
               <div>Protocol: {channel.protocol}</div>
               <div>Upstream Base URL: {channel.baseUrl}</div>
               <div>Models: {channel.models.length > 0 ? channel.models.join(', ') : 'n/a'}</div>
-              <div>
-                Legacy configJson: {channel.configJson === '{}' ? 'n/a' : channel.configJson}
-              </div>
+              {channel.configJson !== '{}' ? (
+                <div>Legacy configJson: {channel.configJson}</div>
+              ) : null}
               <div>Status: {channel.status}</div>
               <div>Gateway health: {channel.gatewayHealthStatus}</div>
               <div>
