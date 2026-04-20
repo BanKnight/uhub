@@ -88,8 +88,9 @@ async function main() {
     },
     async (baseUrl) => {
       const cookie = await ensureAdminSession();
+      const channelName = `openai-nonstream-${Date.now()}`;
       const channelId = await createChannel(cookie, {
-        name: `openai-nonstream-${Date.now()}`,
+        name: channelName,
         baseUrl,
       });
       const rawKey = await createApiKey(cookie, {
@@ -124,20 +125,28 @@ async function main() {
       const overview = await requestJson('/portal/me', { method: 'GET' }, portalCookie);
       assert(overview.response.ok, `Portal me failed: ${JSON.stringify(overview.json)}`);
       assert(
-        overview.json?.usage?.inputTokens === 11,
+        overview.json?.usage?.tokens?.inputTokens === 11,
         `Unexpected overview: ${JSON.stringify(overview.json)}`
       );
       assert(
-        overview.json?.usage?.outputTokens === 7,
+        overview.json?.usage?.tokens?.outputTokens === 7,
         `Unexpected overview: ${JSON.stringify(overview.json)}`
       );
       assert(
-        overview.json?.usage?.totalTokens === 18,
+        overview.json?.usage?.tokens?.totalTokens === 18,
         `Unexpected overview: ${JSON.stringify(overview.json)}`
       );
       assert(
-        overview.json?.usage?.tokenUsageAvailability === 'available',
+        overview.json?.usage?.tokens?.tokenUsageAvailability === 'available',
         `Unexpected overview availability: ${JSON.stringify(overview.json)}`
+      );
+      assert(
+        overview.json?.apiKey?.channels?.[0]?.name === channelName,
+        `Unexpected apiKey channels: ${JSON.stringify(overview.json)}`
+      );
+      assert(
+        overview.json?.apiKey?.channels?.[0]?.provider === 'openai',
+        `Unexpected apiKey channels: ${JSON.stringify(overview.json)}`
       );
 
       const history = await requestJson('/portal/requests', { method: 'GET' }, portalCookie);
@@ -165,6 +174,14 @@ async function main() {
       assert(
         history.json[0]?.tokenUsageAvailability === 'available',
         `Unexpected history availability: ${JSON.stringify(history.json)}`
+      );
+      assert(
+        history.json[0]?.channelName === channelName,
+        `Unexpected history item: ${JSON.stringify(history.json)}`
+      );
+      assert(
+        history.json[0]?.provider === 'openai',
+        `Unexpected history item: ${JSON.stringify(history.json)}`
       );
 
       const audit = await requestJson(
@@ -208,6 +225,11 @@ async function main() {
       assert(
         analyticsData?.tokenUsageAvailability === 'available',
         `Unexpected analytics availability: ${JSON.stringify(analytics.json)}`
+      );
+      assert(
+        analyticsData?.channelBreakdown?.find((item) => item.channelId === channelId)?.provider ===
+          'openai',
+        `Unexpected channel provider: ${JSON.stringify(analytics.json)}`
       );
       const endpointItem = analyticsData?.endpointBreakdown?.find(
         (item) => item.endpoint === 'openai_chat_completions'

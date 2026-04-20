@@ -7,6 +7,7 @@ export const channelProtocolSchema = z.enum([
   'anthropic_messages',
   'gemini_contents',
 ]);
+export const gatewayChannelHealthStatusSchema = z.enum(['healthy', 'cooling_down']);
 
 export type ChannelProvider = z.infer<typeof channelProviderSchema>;
 export type ChannelProtocol = z.infer<typeof channelProtocolSchema>;
@@ -35,14 +36,24 @@ function assertChannelProviderProtocol(
 export const channelSchema = z.object({
   id: z.string(),
   name: z.string(),
-  provider: z.string(),
+  provider: channelProviderSchema,
   protocol: channelProtocolSchema,
   baseUrl: z.string(),
   models: z.array(z.string()),
   status: channelStatusSchema,
+  gatewayHealthStatus: gatewayChannelHealthStatusSchema,
+  gatewayUnhealthyUntil: z.number().int().nullable(),
   configJson: z.string(),
   createdAt: z.number(),
   updatedAt: z.number(),
+});
+
+export const channelSummarySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  provider: channelProviderSchema,
+  models: z.array(z.string()),
+  status: channelStatusSchema,
 });
 
 const baseChannelInputSchema = z.object({
@@ -70,6 +81,7 @@ export const updateChannelStatusInputSchema = z.object({
 });
 
 export type Channel = z.infer<typeof channelSchema>;
+export type ChannelSummary = z.infer<typeof channelSummarySchema>;
 export type CreateChannelInput = z.infer<typeof createChannelInputSchema>;
 export type UpdateChannelInput = z.infer<typeof updateChannelInputSchema>;
 export type UpdateChannelStatusInput = z.infer<typeof updateChannelStatusInputSchema>;

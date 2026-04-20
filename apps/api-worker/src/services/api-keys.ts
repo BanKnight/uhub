@@ -2,6 +2,7 @@ import { TRPCError } from '@trpc/server';
 import { asc, desc, eq, inArray } from 'drizzle-orm';
 import type {
   ApiKey,
+  ApiKeyChannelSummary,
   ApiKeyUsageSummary,
   CreateApiKeyInput,
   CreateApiKeyResult,
@@ -28,6 +29,17 @@ type ApiKeyLookup = {
   channelIds: string[];
   endpointRules: ApiKey['endpointRules'];
 };
+
+function parseModels(modelsJson: string): string[] {
+  try {
+    const parsed = JSON.parse(modelsJson) as unknown;
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === 'string')
+      : [];
+  } catch {
+    return [];
+  }
+}
 
 function toHex(buffer: ArrayBuffer) {
   return Array.from(new Uint8Array(buffer))
@@ -66,6 +78,35 @@ async function getRules(env: WorkerEnv, apiKeyId: string) {
   };
 }
 
+async function getChannelSummaries(
+  env: WorkerEnv,
+  channelIds: string[]
+): Promise<ApiKeyChannelSummary[]> {
+  if (channelIds.length === 0) {
+    return [];
+  }
+
+  const db = getDb(env);
+  const rows = await db.select().from(channels).where(inArray(channels.id, channelIds));
+  const summariesById = new Map(
+    rows.map((row) => [
+      row.id,
+      {
+        id: row.id,
+        name: row.name,
+        provider: row.provider as ApiKeyChannelSummary['provider'],
+        models: parseModels(row.modelsJson),
+        status: row.status as ApiKeyChannelSummary['status'],
+      } satisfies ApiKeyChannelSummary,
+    ])
+  );
+
+  return channelIds.flatMap((channelId) => {
+    const summary = summariesById.get(channelId);
+    return summary ? [summary] : [];
+  });
+}
+
 async function hydrateApiKey(env: WorkerEnv, apiKeyId: string): Promise<ApiKey | null> {
   const db = getDb(env);
   const row = await db.select().from(apiKeys).where(eq(apiKeys.id, apiKeyId)).get();
@@ -75,6 +116,7 @@ async function hydrateApiKey(env: WorkerEnv, apiKeyId: string): Promise<ApiKey |
   }
 
   const rules = await getRules(env, apiKeyId);
+  const channelSummaries = await getChannelSummaries(env, rules.channelIds);
 
   return {
     id: row.id,
@@ -89,6 +131,7 @@ async function hydrateApiKey(env: WorkerEnv, apiKeyId: string): Promise<ApiKey |
     updatedAt: row.updatedAt,
     channelIds: rules.channelIds,
     endpointRules: rules.endpointRules,
+    channels: channelSummaries,
     quota: {
       requestLimit: row.requestQuotaLimit ?? null,
     },

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { channelSummarySchema } from './channels';
 
 export const apiKeyStatusSchema = z.enum(['active', 'disabled', 'expired', 'revoked']);
 export const endpointRuleSchema = z.enum([
@@ -16,6 +17,19 @@ export const apiKeyQuotaSchema = z.object({
   requestLimit: z.number().int().positive().nullable(),
 });
 
+export const tokenUsageSchema = z.object({
+  inputTokens: nullableUsageMetricSchema,
+  outputTokens: nullableUsageMetricSchema,
+  totalTokens: nullableUsageMetricSchema,
+  tokenUsageAvailability: summaryTokenUsageAvailabilitySchema,
+});
+
+export const requestQuotaUsageSchema = z.object({
+  quotaLimit: nullableUsageMetricSchema,
+  quotaUsed: nullableUsageMetricSchema,
+  quotaRemaining: nullableUsageMetricSchema,
+});
+
 export const apiKeyUsageSummarySchema = z.object({
   totalRequests: usageCountSchema,
   successRequests: usageCountSchema,
@@ -29,7 +43,11 @@ export const apiKeyUsageSummarySchema = z.object({
   quotaLimit: nullableUsageMetricSchema,
   quotaUsed: nullableUsageMetricSchema,
   quotaRemaining: nullableUsageMetricSchema,
+  tokens: tokenUsageSchema,
+  quota: requestQuotaUsageSchema,
 });
+
+export const apiKeyChannelSummarySchema = channelSummarySchema;
 
 export const apiKeySchema = z.object({
   id: z.string(),
@@ -44,6 +62,7 @@ export const apiKeySchema = z.object({
   updatedAt: z.number(),
   channelIds: z.array(z.string()),
   endpointRules: z.array(endpointRuleSchema),
+  channels: z.array(apiKeyChannelSummarySchema),
   quota: apiKeyQuotaSchema,
 });
 
@@ -86,7 +105,10 @@ export const portalExchangeResultSchema = z.object({
 });
 
 export type ApiKeyQuota = z.infer<typeof apiKeyQuotaSchema>;
+export type TokenUsage = z.infer<typeof tokenUsageSchema>;
+export type RequestQuotaUsage = z.infer<typeof requestQuotaUsageSchema>;
 export type ApiKeyUsageSummary = z.infer<typeof apiKeyUsageSummarySchema>;
+export type ApiKeyChannelSummary = z.infer<typeof apiKeyChannelSummarySchema>;
 export type ApiKey = z.infer<typeof apiKeySchema>;
 export type PortalOverview = z.infer<typeof portalOverviewSchema>;
 export type CreateApiKeyInput = z.infer<typeof createApiKeyInputSchema>;

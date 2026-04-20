@@ -87,6 +87,8 @@ async function main() {
       const cookie = await ensureAdminSession();
       const channelId = await createChannel(cookie, {
         name: `gemini-nonstream-${Date.now()}`,
+        provider: 'gemini',
+        protocol: 'gemini_contents',
         baseUrl,
       });
       const rawKey = await createApiKey(cookie, {

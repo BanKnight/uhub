@@ -108,6 +108,7 @@ async function listChannelAnalytics(env: WorkerEnv): Promise<ChannelAnalyticsIte
     .select({
       channelId: requests.channelId,
       channelName: channels.name,
+      provider: channels.provider,
       totalRequests: totalRequestsExpr,
       completedRequests: completedRequestsExpr,
       failedRequests: failedRequestsExpr,
@@ -122,12 +123,13 @@ async function listChannelAnalytics(env: WorkerEnv): Promise<ChannelAnalyticsIte
     .from(requests)
     .leftJoin(channels, eq(requests.channelId, channels.id))
     .where(isNotNull(requests.channelId))
-    .groupBy(requests.channelId, channels.name)
+    .groupBy(requests.channelId, channels.name, channels.provider)
     .orderBy(desc(totalRequestsExpr));
 
   return rows.map((row) => ({
     channelId: row.channelId as string,
     channelName: row.channelName ?? null,
+    provider: row.provider === null ? null : (row.provider as ChannelAnalyticsItem['provider']),
     totalRequests: row.totalRequests,
     completedRequests: row.completedRequests,
     failedRequests: row.failedRequests,

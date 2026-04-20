@@ -62,6 +62,8 @@ async function main() {
       const cookie = await ensureAdminSession();
       const channelId = await createChannel(cookie, {
         name: `anthropic-nonstream-${Date.now()}`,
+        provider: 'anthropic',
+        protocol: 'anthropic_messages',
         baseUrl,
       });
       const rawKey = await createApiKey(cookie, {

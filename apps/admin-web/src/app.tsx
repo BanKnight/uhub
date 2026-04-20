@@ -176,6 +176,10 @@ function formatNullableMetric(value: number | null) {
   return value === null ? 'n/a' : value;
 }
 
+function formatNullableTimestamp(value: number | null) {
+  return value === null ? 'n/a' : new Date(value).toISOString();
+}
+
 function AnalyticsSection({ analytics }: { analytics: AnalyticsSummary }) {
   return (
     <section>
@@ -227,6 +231,7 @@ function AnalyticsSection({ analytics }: { analytics: AnalyticsSummary }) {
           <li key={item.channelId}>
             <strong>{item.channelName ?? item.channelId}</strong>
             <div>Channel ID: {item.channelId}</div>
+            <div>Provider: {item.provider ?? 'n/a'}</div>
             <div>Total: {item.totalRequests}</div>
             <div>Completed: {item.completedRequests}</div>
             <div>Failed: {item.failedRequests}</div>
@@ -344,6 +349,7 @@ function AuditSection({
             <div>Prefix: {item.apiKeyPrefix ?? 'n/a'}</div>
             <div>Endpoint: {item.endpoint}</div>
             <div>Channel: {item.channelName ?? item.channelId ?? 'n/a'}</div>
+            <div>Provider: {item.provider ?? 'n/a'}</div>
             <div>Status: {item.status}</div>
             <div>HTTP: {item.httpStatus ?? 'n/a'}</div>
             <div>Latency: {item.latencyMs ?? 'n/a'}</div>
@@ -641,6 +647,10 @@ function ChannelsPage() {
                 Legacy configJson: {channel.configJson === '{}' ? 'n/a' : channel.configJson}
               </div>
               <div>Status: {channel.status}</div>
+              <div>Gateway health: {channel.gatewayHealthStatus}</div>
+              <div>
+                Gateway unhealthy until: {formatNullableTimestamp(channel.gatewayUnhealthyUntil)}
+              </div>
               {canEdit ? (
                 <button
                   type="button"
@@ -807,7 +817,14 @@ function ChannelsPage() {
               <div>Max concurrency: {apiKey.maxConcurrency}</div>
               <div>Request quota: {apiKey.quota.requestLimit ?? 'unlimited'}</div>
               <div>Endpoints: {apiKey.endpointRules.join(', ')}</div>
-              <div>Channels: {apiKey.channelIds.join(', ')}</div>
+              <div>
+                Channels:{' '}
+                {apiKey.channels.length > 0
+                  ? apiKey.channels
+                      .map((channel) => `${channel.name} (${channel.provider})`)
+                      .join(', ')
+                  : apiKey.channelIds.join(', ')}
+              </div>
               <div>
                 Expires at: {apiKey.expiresAt ? new Date(apiKey.expiresAt).toISOString() : 'never'}
               </div>

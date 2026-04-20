@@ -77,8 +77,9 @@ async function main() {
     }),
     async (baseUrl) => {
       const adminCookie = await ensureAdminSession();
+      const channelName = `portal-quota-${Date.now()}`;
       const channelId = await createChannel(adminCookie, {
-        name: `portal-quota-${Date.now()}`,
+        name: channelName,
         baseUrl,
         protocol: 'openai_chat_completions',
         models: ['gpt-4o-mini'],
@@ -109,32 +110,40 @@ async function main() {
         `Unexpected apiKey quota: ${JSON.stringify(overview.json)}`
       );
       assert(
-        overview.json?.usage?.quotaLimit === 1,
+        overview.json?.usage?.quota?.quotaLimit === 1,
         `Unexpected quotaLimit: ${JSON.stringify(overview.json)}`
       );
       assert(
-        overview.json?.usage?.quotaUsed === 1,
+        overview.json?.usage?.quota?.quotaUsed === 1,
         `Unexpected quotaUsed: ${JSON.stringify(overview.json)}`
       );
       assert(
-        overview.json?.usage?.quotaRemaining === 0,
+        overview.json?.usage?.quota?.quotaRemaining === 0,
         `Unexpected quotaRemaining: ${JSON.stringify(overview.json)}`
       );
       assert(
-        overview.json?.usage?.inputTokens === 9,
+        overview.json?.usage?.tokens?.inputTokens === 9,
         `Unexpected inputTokens: ${JSON.stringify(overview.json)}`
       );
       assert(
-        overview.json?.usage?.outputTokens === 4,
+        overview.json?.usage?.tokens?.outputTokens === 4,
         `Unexpected outputTokens: ${JSON.stringify(overview.json)}`
       );
       assert(
-        overview.json?.usage?.totalTokens === 13,
+        overview.json?.usage?.tokens?.totalTokens === 13,
         `Unexpected totalTokens: ${JSON.stringify(overview.json)}`
       );
       assert(
-        overview.json?.usage?.tokenUsageAvailability === 'available',
+        overview.json?.usage?.tokens?.tokenUsageAvailability === 'available',
         `Unexpected tokenUsageAvailability: ${JSON.stringify(overview.json)}`
+      );
+      assert(
+        overview.json?.apiKey?.channels?.[0]?.name === channelName,
+        `Unexpected apiKey channels: ${JSON.stringify(overview.json)}`
+      );
+      assert(
+        overview.json?.apiKey?.channels?.[0]?.provider === 'openai',
+        `Unexpected apiKey channels: ${JSON.stringify(overview.json)}`
       );
 
       console.log(

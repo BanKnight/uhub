@@ -59,6 +59,10 @@ async function main() {
         `Unexpected models: ${JSON.stringify(created)}`
       );
       assert(created.configJson === '{}', `Unexpected configJson: ${JSON.stringify(created)}`);
+      assert(
+        created.gatewayHealthStatus === 'healthy' && created.gatewayUnhealthyUntil === null,
+        `Unexpected gateway health: ${JSON.stringify(created)}`
+      );
 
       const updated = await updateChannel(cookie, {
         id: channelId,
@@ -82,6 +86,10 @@ async function main() {
       assert(
         updated.configJson === '{}',
         `Unexpected update configJson: ${JSON.stringify(updated)}`
+      );
+      assert(
+        updated.gatewayHealthStatus === 'healthy' && updated.gatewayUnhealthyUntil === null,
+        `Unexpected update gateway health: ${JSON.stringify(updated)}`
       );
 
       const updatedList = await listChannels(cookie);
@@ -114,6 +122,11 @@ async function main() {
       assert(
         reactivatedFromList?.status === 'active',
         `Unexpected reactivated listed status: ${JSON.stringify(reactivatedFromList)}`
+      );
+      assert(
+        reactivatedFromList?.gatewayHealthStatus === 'healthy' &&
+          reactivatedFromList?.gatewayUnhealthyUntil === null,
+        `Unexpected reactivated gateway health: ${JSON.stringify(reactivatedFromList)}`
       );
 
       console.log(

@@ -126,6 +126,14 @@ function App() {
                   </li>
                   <li>Max concurrency: {overview.apiKey.maxConcurrency}</li>
                   <li>Allowed endpoints: {overview.apiKey.endpointRules.join(', ')}</li>
+                  <li>
+                    Allowed channels:{' '}
+                    {overview.apiKey.channels.length > 0
+                      ? overview.apiKey.channels
+                          .map((channel) => `${channel.name} (${channel.provider})`)
+                          .join(', ')
+                      : 'n/a'}
+                  </li>
                 </ul>
 
                 <h3>Usage</h3>
@@ -134,14 +142,16 @@ function App() {
                   <li>Success: {overview.usage.successRequests}</li>
                   <li>Failed: {overview.usage.failedRequests}</li>
                   <li>Rejected: {overview.usage.rejectedRequests}</li>
-                  <li>Input tokens: {formatNullableMetric(overview.usage.inputTokens)}</li>
-                  <li>Output tokens: {formatNullableMetric(overview.usage.outputTokens)}</li>
-                  <li>Total tokens: {formatNullableMetric(overview.usage.totalTokens)}</li>
-                  <li>Token availability: {overview.usage.tokenUsageAvailability}</li>
+                  <li>Input tokens: {formatNullableMetric(overview.usage.tokens.inputTokens)}</li>
+                  <li>Output tokens: {formatNullableMetric(overview.usage.tokens.outputTokens)}</li>
+                  <li>Total tokens: {formatNullableMetric(overview.usage.tokens.totalTokens)}</li>
+                  <li>Token availability: {overview.usage.tokens.tokenUsageAvailability}</li>
                   <li>Last used at: {formatNullableTimestamp(overview.usage.lastUsedAt)}</li>
-                  <li>Quota limit: {formatNullableMetric(overview.usage.quotaLimit)}</li>
-                  <li>Quota used: {formatNullableMetric(overview.usage.quotaUsed)}</li>
-                  <li>Quota remaining: {formatNullableMetric(overview.usage.quotaRemaining)}</li>
+                  <li>Quota limit: {formatNullableMetric(overview.usage.quota.quotaLimit)}</li>
+                  <li>Quota used: {formatNullableMetric(overview.usage.quota.quotaUsed)}</li>
+                  <li>
+                    Quota remaining: {formatNullableMetric(overview.usage.quota.quotaRemaining)}
+                  </li>
                 </ul>
               </>
             ) : null}
@@ -155,6 +165,9 @@ function App() {
                 {requests.map((request) => (
                   <li key={request.id}>
                     <strong>{request.endpoint}</strong>
+                    <div>Model: {request.model ?? 'n/a'}</div>
+                    <div>Channel: {request.channelName ?? request.channelId ?? 'n/a'}</div>
+                    <div>Provider: {request.provider ?? 'n/a'}</div>
                     <div>Status: {request.status}</div>
                     <div>Trace: {request.traceId ?? 'n/a'}</div>
                     <div>Latency: {request.latencyMs ?? 'n/a'}</div>

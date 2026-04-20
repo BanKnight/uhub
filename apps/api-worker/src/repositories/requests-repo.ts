@@ -40,6 +40,29 @@ type TokenUsageAggregateRow = {
   totalTokens: number | null;
 };
 
+type RequestHistoryRow = {
+  id: string;
+  endpoint: string;
+  model: string | null;
+  channelId: string | null;
+  channelName: string | null;
+  provider: string | null;
+  traceId: string | null;
+  status: GatewayRequestStatus;
+  failureClass: GatewayFailureClass | null;
+  httpStatus: number | null;
+  latencyMs: number | null;
+  requestSize: number | null;
+  responseSize: number | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  totalTokens: number | null;
+  tokenUsageAvailability: RequestHistoryItem['tokenUsageAvailability'];
+  startedAt: number;
+  finishedAt: number | null;
+  createdAt: number;
+};
+
 function toSummaryTokenUsageAvailability(row: TokenUsageAggregateRow) {
   if (row.availableCount === 0) {
     return 'unavailable' as const;
@@ -75,12 +98,14 @@ export function toRequestTokenUsage(
   };
 }
 
-function mapRequestRowToHistoryItem(row: typeof requests.$inferSelect): RequestHistoryItem {
+function mapRequestRowToHistoryItem(row: RequestHistoryRow): RequestHistoryItem {
   return {
     id: row.id,
     endpoint: row.endpoint as GatewayEndpoint,
     model: row.model ?? null,
     channelId: row.channelId ?? null,
+    channelName: row.channelName ?? null,
+    provider: row.provider === null ? null : (row.provider as RequestHistoryItem['provider']),
     traceId: row.traceId ?? null,
     status: row.status,
     failureClass: row.failureClass ?? null,
@@ -107,20 +132,42 @@ function toApiKeyUsageSummary(input: {
   requestLimit: number | null;
   tokenUsage: TokenUsageAggregateRow;
 }): ApiKeyUsageSummary {
+  const inputTokens =
+    input.tokenUsage.availableCount > 0 ? (input.tokenUsage.inputTokens ?? 0) : null;
+  const outputTokens =
+    input.tokenUsage.availableCount > 0 ? (input.tokenUsage.outputTokens ?? 0) : null;
+  const totalTokens =
+    input.tokenUsage.availableCount > 0 ? (input.tokenUsage.totalTokens ?? 0) : null;
+  const tokenUsageAvailability = toSummaryTokenUsageAvailability(input.tokenUsage);
+  const quotaLimit = input.requestLimit;
+  const quotaUsed = input.totalRequests;
+  const quotaRemaining =
+    input.requestLimit === null ? null : Math.max(input.requestLimit - input.totalRequests, 0);
+
   return {
     totalRequests: input.totalRequests,
     successRequests: input.successRequests,
     failedRequests: input.failedRequests,
     rejectedRequests: input.rejectedRequests,
-    inputTokens: input.tokenUsage.availableCount > 0 ? (input.tokenUsage.inputTokens ?? 0) : null,
-    outputTokens: input.tokenUsage.availableCount > 0 ? (input.tokenUsage.outputTokens ?? 0) : null,
-    totalTokens: input.tokenUsage.availableCount > 0 ? (input.tokenUsage.totalTokens ?? 0) : null,
-    tokenUsageAvailability: toSummaryTokenUsageAvailability(input.tokenUsage),
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    tokenUsageAvailability,
     lastUsedAt: input.lastUsedAt,
-    quotaLimit: input.requestLimit,
-    quotaUsed: input.totalRequests,
-    quotaRemaining:
-      input.requestLimit === null ? null : Math.max(input.requestLimit - input.totalRequests, 0),
+    quotaLimit,
+    quotaUsed,
+    quotaRemaining,
+    tokens: {
+      inputTokens,
+      outputTokens,
+      totalTokens,
+      tokenUsageAvailability,
+    },
+    quota: {
+      quotaLimit,
+      quotaUsed,
+      quotaRemaining,
+    },
   };
 }
 
@@ -200,8 +247,30 @@ export async function listRequestsByApiKey(
 ): Promise<RequestHistoryItem[]> {
   const db = getDb(env);
   const rows = await db
-    .select()
+    .select({
+      id: requests.id,
+      endpoint: requests.endpoint,
+      model: requests.model,
+      channelId: requests.channelId,
+      channelName: channels.name,
+      provider: channels.provider,
+      traceId: requests.traceId,
+      status: requests.status,
+      failureClass: requests.failureClass,
+      httpStatus: requests.httpStatus,
+      latencyMs: requests.latencyMs,
+      requestSize: requests.requestSize,
+      responseSize: requests.responseSize,
+      inputTokens: requests.inputTokens,
+      outputTokens: requests.outputTokens,
+      totalTokens: requests.totalTokens,
+      tokenUsageAvailability: requests.tokenUsageAvailability,
+      startedAt: requests.startedAt,
+      finishedAt: requests.finishedAt,
+      createdAt: requests.createdAt,
+    })
     .from(requests)
+    .leftJoin(channels, eq(requests.channelId, channels.id))
     .where(eq(requests.apiKeyId, apiKeyId))
     .orderBy(desc(requests.createdAt))
     .limit(20);
@@ -229,6 +298,7 @@ export async function listRecentRequestsForAdmin(
       apiKeyPrefix: apiKeys.keyPrefix,
       channelId: requests.channelId,
       channelName: channels.name,
+      provider: channels.provider,
       endpoint: requests.endpoint,
       model: requests.model,
       traceId: requests.traceId,
@@ -256,6 +326,7 @@ export async function listRecentRequestsForAdmin(
     apiKeyPrefix: row.apiKeyPrefix ?? null,
     channelId: row.channelId ?? null,
     channelName: row.channelName ?? null,
+    provider: row.provider === null ? null : (row.provider as AuditRequestItem['provider']),
     endpoint: row.endpoint as GatewayEndpoint,
     model: row.model ?? null,
     traceId: row.traceId ?? null,

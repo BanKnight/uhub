@@ -53,26 +53,8 @@ jobs:
           set -euo pipefail
           mkdir -p artifacts
 
-          cleanup() {
-            if [ -f artifacts/worker.pid ]; then
-              kill "$(cat artifacts/worker.pid)" 2>/dev/null || true
-            fi
-          }
-          trap cleanup EXIT
-
-          export UHUB_ADMIN_EMAIL="ci-admin@example.com"
-          export UHUB_ADMIN_PASSWORD="ci-admin-password-123"
-
           bun install --frozen-lockfile 2>&1 | tee artifacts/install.log
-          bun run db:migrate:local 2>&1 | tee artifacts/db-migrate.log
-
-          bun run --cwd apps/api-worker dev -- --config wrangler.jsonc --port 8797 --var ADMIN_EMAIL:$UHUB_ADMIN_EMAIL --var ADMIN_PASSWORD:$UHUB_ADMIN_PASSWORD --var GATEWAY_TIMEOUT_MS:1000 --var GATEWAY_CHANNEL_UNHEALTHY_COOLDOWN_MS:1000 > artifacts/worker.log 2>&1 &
-          echo $! > artifacts/worker.pid
-
-          export UHUB_WORKER_BASE_URL="http://127.0.0.1:8797"
-          timeout 30 bash -lc 'until curl -fsS "$UHUB_WORKER_BASE_URL/healthz"; do sleep 1; done'
-
-          bun run test:integration:openai 2>&1 | tee artifacts/openai.log
+          UHUB_ARTIFACTS_DIR=artifacts bun run test:integration:openai:local 2>&1 | tee artifacts/openai.log
 
       - name: Upload OpenAI artifacts
         if: always()
@@ -100,26 +82,8 @@ jobs:
           set -euo pipefail
           mkdir -p artifacts
 
-          cleanup() {
-            if [ -f artifacts/worker.pid ]; then
-              kill "$(cat artifacts/worker.pid)" 2>/dev/null || true
-            fi
-          }
-          trap cleanup EXIT
-
-          export UHUB_ADMIN_EMAIL="ci-admin@example.com"
-          export UHUB_ADMIN_PASSWORD="ci-admin-password-123"
-
           bun install --frozen-lockfile 2>&1 | tee artifacts/install.log
-          bun run db:migrate:local 2>&1 | tee artifacts/db-migrate.log
-
-          bun run --cwd apps/api-worker dev -- --config wrangler.jsonc --port 8797 --var ADMIN_EMAIL:$UHUB_ADMIN_EMAIL --var ADMIN_PASSWORD:$UHUB_ADMIN_PASSWORD --var GATEWAY_TIMEOUT_MS:1000 --var GATEWAY_CHANNEL_UNHEALTHY_COOLDOWN_MS:1000 > artifacts/worker.log 2>&1 &
-          echo $! > artifacts/worker.pid
-
-          export UHUB_WORKER_BASE_URL="http://127.0.0.1:8797"
-          timeout 30 bash -lc 'until curl -fsS "$UHUB_WORKER_BASE_URL/healthz"; do sleep 1; done'
-
-          bun run test:integration:anthropic 2>&1 | tee artifacts/anthropic.log
+          UHUB_ARTIFACTS_DIR=artifacts bun run test:integration:anthropic:local 2>&1 | tee artifacts/anthropic.log
 
       - name: Upload Anthropic artifacts
         if: always()
@@ -147,26 +111,8 @@ jobs:
           set -euo pipefail
           mkdir -p artifacts
 
-          cleanup() {
-            if [ -f artifacts/worker.pid ]; then
-              kill "$(cat artifacts/worker.pid)" 2>/dev/null || true
-            fi
-          }
-          trap cleanup EXIT
-
-          export UHUB_ADMIN_EMAIL="ci-admin@example.com"
-          export UHUB_ADMIN_PASSWORD="ci-admin-password-123"
-
           bun install --frozen-lockfile 2>&1 | tee artifacts/install.log
-          bun run db:migrate:local 2>&1 | tee artifacts/db-migrate.log
-
-          bun run --cwd apps/api-worker dev -- --config wrangler.jsonc --port 8797 --var ADMIN_EMAIL:$UHUB_ADMIN_EMAIL --var ADMIN_PASSWORD:$UHUB_ADMIN_PASSWORD --var GATEWAY_TIMEOUT_MS:1000 --var GATEWAY_CHANNEL_UNHEALTHY_COOLDOWN_MS:1000 > artifacts/worker.log 2>&1 &
-          echo $! > artifacts/worker.pid
-
-          export UHUB_WORKER_BASE_URL="http://127.0.0.1:8797"
-          timeout 30 bash -lc 'until curl -fsS "$UHUB_WORKER_BASE_URL/healthz"; do sleep 1; done'
-
-          bun run test:integration:gemini 2>&1 | tee artifacts/gemini.log
+          UHUB_ARTIFACTS_DIR=artifacts bun run test:integration:gemini:local 2>&1 | tee artifacts/gemini.log
 
   e2e-core:
     runs-on: ubuntu-latest
@@ -187,26 +133,8 @@ jobs:
           set -euo pipefail
           mkdir -p artifacts
 
-          cleanup() {
-            if [ -f artifacts/worker.pid ]; then
-              kill "$(cat artifacts/worker.pid)" 2>/dev/null || true
-            fi
-          }
-          trap cleanup EXIT
-
-          export UHUB_ADMIN_EMAIL="ci-admin@example.com"
-          export UHUB_ADMIN_PASSWORD="ci-admin-password-123"
-
           bun install --frozen-lockfile 2>&1 | tee artifacts/install.log
-          bun run db:migrate:local 2>&1 | tee artifacts/db-migrate.log
-
-          bun run --cwd apps/api-worker dev -- --config wrangler.jsonc --port 8797 --var ADMIN_EMAIL:$UHUB_ADMIN_EMAIL --var ADMIN_PASSWORD:$UHUB_ADMIN_PASSWORD --var GATEWAY_TIMEOUT_MS:1000 --var GATEWAY_CHANNEL_UNHEALTHY_COOLDOWN_MS:1000 > artifacts/worker.log 2>&1 &
-          echo $! > artifacts/worker.pid
-
-          export UHUB_WORKER_BASE_URL="http://127.0.0.1:8797"
-          timeout 30 bash -lc 'until curl -fsS "$UHUB_WORKER_BASE_URL/healthz"; do sleep 1; done'
-
-          bun run test:e2e:core 2>&1 | tee artifacts/e2e-core.log
+          UHUB_ARTIFACTS_DIR=artifacts bun run test:e2e:core 2>&1 | tee artifacts/e2e-core.log
 
       - name: Upload core e2e artifacts
         if: always()

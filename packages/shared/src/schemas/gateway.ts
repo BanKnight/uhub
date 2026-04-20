@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { endpointRuleSchema, requestTokenUsageAvailabilitySchema } from './api-keys';
+import { channelProviderSchema } from './channels';
 
 export const gatewayEndpointSchema = endpointRuleSchema;
 
@@ -215,6 +216,8 @@ export const requestHistoryItemSchema = z.object({
   endpoint: gatewayEndpointSchema,
   model: z.string().nullable(),
   channelId: z.string().nullable(),
+  channelName: z.string().nullable(),
+  provider: channelProviderSchema.nullable(),
   traceId: z.string().nullable(),
   status: gatewayRequestStatusSchema,
   failureClass: gatewayFailureClassSchema.nullable(),

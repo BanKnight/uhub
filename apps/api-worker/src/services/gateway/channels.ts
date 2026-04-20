@@ -12,6 +12,38 @@ export type GatewayChannel = {
   baseUrl: string;
 };
 
+export type GatewayChannelHealthSnapshot = {
+  gatewayHealthStatus: 'healthy' | 'cooling_down';
+  gatewayUnhealthyUntil: number | null;
+};
+
+export function getGatewayChannelHealthSnapshot(
+  channelId: string,
+  now = Date.now()
+): GatewayChannelHealthSnapshot {
+  const unhealthyUntil = channelUnhealthyUntil.get(channelId);
+
+  if (!unhealthyUntil) {
+    return {
+      gatewayHealthStatus: 'healthy',
+      gatewayUnhealthyUntil: null,
+    };
+  }
+
+  if (unhealthyUntil <= now) {
+    channelUnhealthyUntil.delete(channelId);
+    return {
+      gatewayHealthStatus: 'healthy',
+      gatewayUnhealthyUntil: null,
+    };
+  }
+
+  return {
+    gatewayHealthStatus: 'cooling_down',
+    gatewayUnhealthyUntil: unhealthyUntil,
+  };
+}
+
 function resolveChannelCooldownMs(rawValue: string | undefined, fallback: number) {
   if (!rawValue) {
     return fallback;
@@ -22,18 +54,7 @@ function resolveChannelCooldownMs(rawValue: string | undefined, fallback: number
 }
 
 function isChannelCoolingDown(channelId: string, now = Date.now()) {
-  const unhealthyUntil = channelUnhealthyUntil.get(channelId);
-
-  if (!unhealthyUntil) {
-    return false;
-  }
-
-  if (unhealthyUntil <= now) {
-    channelUnhealthyUntil.delete(channelId);
-    return false;
-  }
-
-  return true;
+  return getGatewayChannelHealthSnapshot(channelId, now).gatewayHealthStatus === 'cooling_down';
 }
 
 export function markGatewayChannelHealthy(channelId: string) {

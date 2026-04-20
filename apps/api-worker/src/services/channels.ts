@@ -7,6 +7,7 @@ import type {
 } from '@uhub/shared';
 import { channels, getDb } from '../db/schema';
 import type { WorkerEnv } from '../index';
+import { getGatewayChannelHealthSnapshot } from './gateway/channels';
 
 function parseModels(modelsJson: string): string[] {
   try {
@@ -20,14 +21,18 @@ function parseModels(modelsJson: string): string[] {
 }
 
 function toChannel(row: typeof channels.$inferSelect): Channel {
+  const gatewayHealth = getGatewayChannelHealthSnapshot(row.id);
+
   return {
     id: row.id,
     name: row.name,
-    provider: row.provider,
+    provider: row.provider as Channel['provider'],
     protocol: row.protocol,
     baseUrl: row.baseUrl,
     models: parseModels(row.modelsJson),
     status: row.status,
+    gatewayHealthStatus: gatewayHealth.gatewayHealthStatus,
+    gatewayUnhealthyUntil: gatewayHealth.gatewayUnhealthyUntil,
     configJson: row.configJson,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,

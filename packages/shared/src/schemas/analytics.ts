@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { gatewayEndpointSchema } from './gateway';
 import { summaryTokenUsageAvailabilitySchema } from './api-keys';
+import { channelProviderSchema } from './channels';
 
 const analyticsCountSchema = z.number().int().nonnegative();
 
@@ -24,6 +25,7 @@ export const endpointAnalyticsItemSchema = z.object({
 export const channelAnalyticsItemSchema = z.object({
   channelId: z.string(),
   channelName: z.string().nullable(),
+  provider: channelProviderSchema.nullable(),
   totalRequests: analyticsCountSchema,
   completedRequests: analyticsCountSchema,
   failedRequests: analyticsCountSchema,

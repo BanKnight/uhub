@@ -1,75 +1,63 @@
 {
   "stories": [
     {
-      "id": "R1-US1",
-      "title": "实现 Gemini stream 主链路生命周期闭环",
+      "id": "P0-US1",
+      "title": "冻结三协议 canonical contract 与 usage parity",
       "priority": 1,
-      "passes": true,
+      "passes": false,
       "acceptanceCriteria": [
-        "`apps/api-worker/src/routers/gateway/gemini-contents.ts` 支持 Gemini stream 请求主链路，不再直接拒绝 stream=true 的最小 happy path",
-        "Gemini stream 在完成、读流中断或超时场景下都能把 request status 正确收敛，且不会留下悬挂 lease",
-        "Gemini stream 相关 request/channel 处理覆盖 channel health 恢复或失败标记，不破坏现有 OpenAI/Anthropic 路径",
-        "Phase 1 明确禁止伪 token 持久化：Gemini stream 缺失 usage 时只允许写入 null/unavailable，不允许写入估算 token、responseSize 或前端推导值"
+        "openai / anthropic / gemini 的共享 request/response/error/usage 最小 contract 在 shared schema、worker 路由与现有测试断言中保持一致，不再新增自由协议字段或自由写入路径",
+        "`configJson` 只保留兼容读取/展示：schema、worker、admin-web 与 integration 测试中不得新增依赖它的写入语义，也不执行删除",
+        "portal/admin 现有读面继续使用当前 nested usage/quota 与现有字段口径；portal history 只证明已有字段一致性，不额外扩面",
+        "`bun run test:integration:ci`、`bun run test:e2e:core`、`bun run check` 在当前分支通过，且三协议 integration 与 portal/admin 现有回归能写死断言状态码、canonical body、usage/token availability、request log 入库、channel/quota/structured 配置读面一致"
       ]
     },
     {
-      "id": "R1-US2",
-      "title": "补齐 Gemini stream 集成验证并通过 Phase 1 质量门",
+      "id": "P1-US1",
+      "title": "硬化 core e2e 与 portal/admin 主链路",
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "acceptanceCriteria": [
-        "存在覆盖 Gemini stream happy path 与生命周期闭环的 integration 测试，且命令入口收口到 bun run test:integration:gemini 或更细分的 Gemini stream 入口",
-        "`bun run test:integration:gemini` 通过，且包含新的 Gemini stream 覆盖",
-        "`bun run test:e2e:core` 通过，证明 Phase 1 没有破坏现有 portal/admin 主链路",
-        "`bun run check` 通过，且没有新增类型、lint、build 回归"
+        "`tests/integration/portal-overview-quota.ts`、`tests/integration/admin-channel-structured.ts`、`tests/e2e/core-flow.ts` 覆盖 portal/admin 主链路的 channel/quota/structured 配置一致性",
+        "admin 创建 channel/key、gateway 调用、portal 展示的闭环在 `tests/e2e/core-flow.ts` 中稳定成立，运行过程中无新增 5xx",
+        "本地重复复跑 `bun run test:integration:openai`、`bun run test:integration:anthropic`、`bun run test:integration:gemini`、`bun run test:e2e:core`、`bun run check` 稳定通过",
+        "`.github/workflows/ci.yml` 继续以 `quality`、`integration-openai`、`integration-anthropic`、`integration-gemini`、`e2e-core` 作为质量门，并与本地 bun 入口保持一致"
       ]
     },
     {
-      "id": "R1-US3",
-      "title": "冻结 token usage 真值的单一持久层与读取契约",
+      "id": "P2-US1",
+      "title": "基线化 anthropic failover 与 tracing/health",
       "priority": 3,
-      "passes": true,
+      "passes": false,
       "acceptanceCriteria": [
-        "token usage 真值在后端存在单一持久层来源，portal/history/admin 读取同一套契约，而不是各自推导",
-        "non-stream 路径在上游提供 usage 时能持久化真实 input/output/total token 值",
-        "stream 路径在具备最终 usage 时能回填真值；上游缺失 usage 时显式落为 null/unavailable，而不是估算",
-        "契约明确定义 null 与 unavailable 语义，并覆盖旧数据兼容，不要求伪补历史 token"
+        "`tests/integration/anthropic-gateway-failover.ts` 覆盖 anthropic 可重试失败后切换成功的主锚场景，不新增 openai/gemini failover 语义",
+        "anthropic failover 的触发条件、request log 字段、channel unhealthy cooldown/恢复在 worker 与 admin audit/request-log 读面上可观测",
+        "openai、anthropic、gemini 三协议响应都返回 `x-trace-id`，相关 integration 断言会校验该头与读面 trace 一致性",
+        "`bun run test:integration:anthropic` 稳定通过，且不会破坏现有 openai/gemini 主链路集成与 admin audit/request-log 可观测回归"
       ]
     },
     {
-      "id": "R1-US4",
-      "title": "完成 token usage 真值的产品面验证收口",
+      "id": "P3-US1",
+      "title": "新增 cost tracking 持久化、聚合与展示",
       "priority": 4,
-      "passes": true,
+      "passes": false,
       "acceptanceCriteria": [
-        "portal overview、request history、admin analytics 或等价读取面，对 token usage 的展示口径与后端契约一致",
-        "quota 与 token usage 语义分离，不会把 requestLimit/requestCount 混充 token 值",
-        "存在覆盖 non-stream、stream、上游缺失 usage 的 integration 验证，且 `bun run test:integration` 通过",
-        "`bun run test:e2e:core` 与相关 portal usage 验证通过，证明真值收口没有破坏现有主链路"
+        "request log 持久化层新增 cost 字段，并与现有 token truth / usage contract 分离，不把 quota 混成 token/cost",
+        "analytics summary 与 portal/admin 展示新增 cost 聚合字段，命名与口径在 shared schema、worker 返回与 UI 展示中保持一致",
+        "openai、anthropic、gemini 至少各有 1 条样例从 cost 采集贯通到 request log、analytics、portal/admin 展示",
+        "新增 cost tracking 后，`bun run test:integration`、`bun run test:e2e:core`、`bun run check` 通过"
       ]
     },
     {
-      "id": "R1-US5",
-      "title": "增强 admin 结构化 provider/model/upstream 配置并保留兼容读取",
+      "id": "P4-US1",
+      "title": "补齐共享 channel 选择与 load balance 基线",
       "priority": 5,
-      "passes": true,
+      "passes": false,
       "acceptanceCriteria": [
-        "channel/admin 配置以结构化 provider/model/upstream 字段表达，不继续新增自由 `configJson` 写入路径",
-        "现有旧 `configJson` 数据仍可被兼容读取或迁移，不阻断已有 channel 展示与使用",
-        "admin-web 的创建/展示/编辑流程覆盖新的结构化字段，且仍只围绕 openai/anthropic/gemini",
-        "实现保持最小范围，不引入与当前主线无关的 provider 扩展或平台化抽象重做"
-      ]
-    },
-    {
-      "id": "R1-US6",
-      "title": "完成 admin 配置增强回归验证并通过最终质量门",
-      "priority": 6,
-      "passes": true,
-      "acceptanceCriteria": [
-        "存在覆盖 admin 结构化配置创建、展示、启停、兼容读取/迁移的验证",
-        "`bun run test:integration` 通过，且包含 admin 配置增强相关覆盖",
-        "`bun run test:e2e:core` 通过，证明 admin 改动未破坏用户主链路",
-        "`bun run check` 通过，准备进入 reviewer verification"
+        "gateway/service 层实现共享 channel 选择与基础负载均衡，只围绕 openai/anthropic/gemini，不引入新的 provider 级语义",
+        "选择结果、回退原因与最终命中 channel 在 tracing / request log / audit 中可追踪、可解释",
+        "load balance 变更不会破坏现有 quota、logging、tracing 与 portal/admin 主链路读面",
+        "新增定向 smoke 后，现有质量门与相关本地 bun 入口继续通过"
       ]
     }
   ]

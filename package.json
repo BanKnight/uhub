@@ -22,7 +22,8 @@
     "db:generate": "bun --cwd apps/api-worker drizzle-kit generate",
     "db:migrate:local": "bun x wrangler d1 migrations apply DB --local --cwd apps/api-worker",
     "test:integration": "bun run test:integration:ci",
-    "test:integration:ci": "bun run test:integration:openai && bun run test:integration:anthropic && bun run test:integration:gemini",
+    "test:integration:ci": "bun run test:integration:ci:local",
+    "test:integration:ci:raw": "bun run test:integration:openai && bun run test:integration:anthropic && bun run test:integration:gemini",
     "test:integration:openai": "bun run test:integration:openai:nonstream && bun run test:integration:portal:overview-quota && bun run test:integration:admin:channel-structured",
     "test:integration:openai:nonstream": "bun tests/integration/openai-nonstream.ts",
     "test:integration:anthropic": "bun run test:integration:anthropic:nonstream && bun run test:integration:anthropic:stream-text && bun run test:integration:anthropic:tool-use-stream && bun run test:integration:anthropic:tool-choice-auto-any && bun run test:integration:anthropic:tool-use-multi-nonstream && bun run test:integration:anthropic:tool-use-multi-stream && bun run test:integration:anthropic:tool-use-nonstream && bun run test:integration:anthropic:invalid-request && bun run test:integration:anthropic:gateway-failover && bun run test:integration:anthropic:tools-request",
@@ -41,7 +42,13 @@
     "test:integration:gemini:stream": "bun tests/integration/gemini-stream.ts",
     "test:integration:admin:channel-structured": "bun tests/integration/admin-channel-structured.ts",
     "test:integration:portal:overview-quota": "bun tests/integration/portal-overview-quota.ts",
-    "test:e2e:core": "bun tests/e2e/core-flow.ts"
+    "test:integration:ci:local": "bun tests/run-with-local-worker.ts bun run test:integration:ci:raw",
+    "test:integration:openai:local": "bun tests/run-with-local-worker.ts bun run test:integration:openai",
+    "test:integration:anthropic:local": "bun tests/run-with-local-worker.ts bun run test:integration:anthropic",
+    "test:integration:gemini:local": "bun tests/run-with-local-worker.ts bun run test:integration:gemini",
+    "test:e2e:core": "bun run test:e2e:core:local",
+    "test:e2e:core:raw": "bun tests/e2e/core-flow.ts",
+    "test:e2e:core:local": "bun tests/run-with-local-worker.ts bun run test:e2e:core:raw"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx,json}": [

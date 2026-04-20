@@ -73,8 +73,9 @@ async function main() {
     }),
     async (baseUrl) => {
       const adminCookie = await ensureAdminSession();
+      const channelName = `e2e-core-${Date.now()}`;
       const channelId = await createChannel(adminCookie, {
-        name: `e2e-core-${Date.now()}`,
+        name: channelName,
         baseUrl,
         protocol: 'openai_chat_completions',
         models: ['gpt-4o-mini'],
@@ -108,16 +109,24 @@ async function main() {
       assert(overview.response.ok, `Portal overview failed: ${JSON.stringify(overview.json)}`);
       assert(requests.response.ok, `Portal requests failed: ${JSON.stringify(requests.json)}`);
       assert(
-        overview.json?.usage?.quotaLimit === 2,
+        overview.json?.usage?.quota?.quotaLimit === 2,
         `Unexpected quotaLimit: ${JSON.stringify(overview.json)}`
       );
       assert(
-        overview.json?.usage?.quotaUsed === 1,
+        overview.json?.usage?.quota?.quotaUsed === 1,
         `Unexpected quotaUsed: ${JSON.stringify(overview.json)}`
       );
       assert(
-        overview.json?.usage?.quotaRemaining === 1,
+        overview.json?.usage?.quota?.quotaRemaining === 1,
         `Unexpected quotaRemaining: ${JSON.stringify(overview.json)}`
+      );
+      assert(
+        overview.json?.apiKey?.channels?.[0]?.name === channelName,
+        `Unexpected apiKey channels: ${JSON.stringify(overview.json)}`
+      );
+      assert(
+        overview.json?.apiKey?.channels?.[0]?.provider === 'openai',
+        `Unexpected apiKey channels: ${JSON.stringify(overview.json)}`
       );
       assert(
         Array.isArray(requests.json),
@@ -131,6 +140,14 @@ async function main() {
       assert(
         requests.json[0]?.status === 'completed',
         `Unexpected request status: ${JSON.stringify(requests.json[0])}`
+      );
+      assert(
+        requests.json[0]?.channelName === channelName,
+        `Unexpected request channel: ${JSON.stringify(requests.json[0])}`
+      );
+      assert(
+        requests.json[0]?.provider === 'openai',
+        `Unexpected request provider: ${JSON.stringify(requests.json[0])}`
       );
 
       console.log(

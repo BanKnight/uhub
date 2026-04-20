@@ -206,8 +206,9 @@ async function runHappyPathScenario() {
       const cookie = await ensureAdminSession();
       const channelId = await createChannel(cookie, {
         name: `gemini-stream-${Date.now()}`,
-        baseUrl,
+        provider: 'gemini',
         protocol: 'gemini_contents',
+        baseUrl,
       });
       const rawKey = await createApiKey(cookie, {
         label: `gemini-stream-key-${Date.now()}`,
@@ -373,11 +374,13 @@ async function runInterruptedStreamScenario() {
           const primaryChannelId = await createChannel(cookie, {
             name: `gemini-stream-interrupted-primary-${Date.now()}`,
             baseUrl: primaryBaseUrl,
+            provider: 'gemini',
             protocol: 'gemini_contents',
           });
           const secondaryChannelId = await createChannel(cookie, {
             name: `gemini-stream-interrupted-secondary-${Date.now()}`,
             baseUrl: secondaryBaseUrl,
+            provider: 'gemini',
             protocol: 'gemini_contents',
           });
           const rawKey = await createApiKey(cookie, {
@@ -488,6 +491,7 @@ async function runTimeoutScenario() {
       const channelId = await createChannel(cookie, {
         name: `gemini-stream-timeout-${Date.now()}`,
         baseUrl,
+        provider: 'gemini',
         protocol: 'gemini_contents',
       });
       const rawKey = await createApiKey(cookie, {

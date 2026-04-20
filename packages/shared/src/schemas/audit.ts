@@ -5,6 +5,7 @@ import {
   gatewayRequestStatusSchema,
 } from './gateway';
 import { requestTokenUsageAvailabilitySchema } from './api-keys';
+import { channelProviderSchema } from './channels';
 
 export const auditRequestItemSchema = z.object({
   id: z.string(),
@@ -13,6 +14,7 @@ export const auditRequestItemSchema = z.object({
   apiKeyPrefix: z.string().nullable(),
   channelId: z.string().nullable(),
   channelName: z.string().nullable(),
+  provider: channelProviderSchema.nullable(),
   endpoint: gatewayEndpointSchema,
   model: z.string().nullable(),
   traceId: z.string().nullable(),
