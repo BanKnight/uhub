@@ -7,12 +7,14 @@ import {
   createApiKey,
   createChannel,
   ensureAdminSession,
+  requestJson,
   withMockJsonUpstream,
   withMockSseUpstream,
 } from './_anthropic';
 
 const MODEL = 'gemini-2.5-flash';
 const STOP_SEQUENCE = '<STOP>';
+const EXPECTED_TOTAL_COST_MICROS = 23;
 const TIMEOUT_DELAY_MS = 1_500;
 const RECOVERY_WAIT_MS = 1_100;
 
@@ -69,6 +71,22 @@ async function readJson(response: Response) {
     text,
     json: text ? JSON.parse(text) : null,
   };
+}
+
+async function exchangePortal(rawKey: string) {
+  const response = await fetch(`${WORKER_BASE_URL}/portal/auth/exchange`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ rawKey }),
+  });
+  const cookie = response.headers.getSetCookie?.()[0]?.split(';', 1)[0] ?? '';
+  const text = await response.text();
+  const json = text ? JSON.parse(text) : null;
+
+  assert(response.ok, `Portal exchange failed: ${JSON.stringify(json)}`);
+  assert(cookie, 'Portal exchange did not establish a session cookie');
+
+  return cookie;
 }
 
 async function fetchAuditRequest(traceId: string, cookie: string) {
@@ -198,14 +216,20 @@ async function runHappyPathScenario() {
               finish_reason: 'stop',
             },
           ],
+          usage: {
+            prompt_tokens: 10,
+            completion_tokens: 8,
+            total_tokens: 18,
+          },
         }),
         'data: [DONE]\n\n',
       ].join('');
     },
     async (baseUrl) => {
       const cookie = await ensureAdminSession();
+      const channelName = `gemini-stream-${Date.now()}`;
       const channelId = await createChannel(cookie, {
-        name: `gemini-stream-${Date.now()}`,
+        name: channelName,
         provider: 'gemini',
         protocol: 'gemini_contents',
         baseUrl,
@@ -244,22 +268,85 @@ async function runHappyPathScenario() {
         `Unexpected final event: ${JSON.stringify(finalEvent)}`
       );
       assert(
-        finalEvent?.usageMetadata?.promptTokenCount === null,
-        `Expected promptTokenCount=null: ${JSON.stringify(finalEvent)}`
+        finalEvent?.usageMetadata?.promptTokenCount === 10,
+        `Unexpected promptTokenCount: ${JSON.stringify(finalEvent)}`
       );
       assert(
-        finalEvent?.usageMetadata?.candidatesTokenCount === null,
-        `Expected candidatesTokenCount=null: ${JSON.stringify(finalEvent)}`
+        finalEvent?.usageMetadata?.candidatesTokenCount === 8,
+        `Unexpected candidatesTokenCount: ${JSON.stringify(finalEvent)}`
       );
       assert(
-        finalEvent?.usageMetadata?.totalTokenCount === null,
-        `Expected totalTokenCount=null: ${JSON.stringify(finalEvent)}`
+        finalEvent?.usageMetadata?.totalTokenCount === 18,
+        `Unexpected totalTokenCount: ${JSON.stringify(finalEvent)}`
+      );
+
+      const portalCookie = await exchangePortal(rawKey);
+      const overview = await requestJson('/portal/me', { method: 'GET' }, portalCookie);
+      assert(overview.response.ok, `Portal me failed: ${JSON.stringify(overview.json)}`);
+      assert(
+        overview.json?.usage?.tokens?.inputTokens === 10,
+        `Unexpected overview: ${JSON.stringify(overview.json)}`
+      );
+      assert(
+        overview.json?.usage?.tokens?.outputTokens === 8,
+        `Unexpected overview: ${JSON.stringify(overview.json)}`
+      );
+      assert(
+        overview.json?.usage?.tokens?.totalTokens === 18,
+        `Unexpected overview: ${JSON.stringify(overview.json)}`
+      );
+      assert(
+        overview.json?.usage?.totalCostMicros === EXPECTED_TOTAL_COST_MICROS,
+        `Unexpected overview cost: ${JSON.stringify(overview.json)}`
+      );
+      assert(
+        overview.json?.usage?.cost?.totalCostMicros === EXPECTED_TOTAL_COST_MICROS,
+        `Unexpected overview nested cost: ${JSON.stringify(overview.json)}`
+      );
+      assert(
+        overview.json?.apiKey?.channels?.[0]?.name === channelName,
+        `Unexpected apiKey channels: ${JSON.stringify(overview.json)}`
+      );
+      assert(
+        overview.json?.apiKey?.channels?.[0]?.provider === 'gemini',
+        `Unexpected apiKey channels: ${JSON.stringify(overview.json)}`
+      );
+
+      const history = await requestJson('/portal/requests', { method: 'GET' }, portalCookie);
+      assert(history.response.ok, `Portal requests failed: ${JSON.stringify(history.json)}`);
+      assert(
+        Array.isArray(history.json) && history.json.length > 0,
+        'Portal requests should not be empty'
+      );
+      assert(
+        history.json[0]?.traceId === traceId,
+        `Unexpected history item: ${JSON.stringify(history.json)}`
+      );
+      assert(
+        history.json[0]?.inputTokens === 10,
+        `Unexpected history item: ${JSON.stringify(history.json)}`
+      );
+      assert(
+        history.json[0]?.outputTokens === 8,
+        `Unexpected history item: ${JSON.stringify(history.json)}`
+      );
+      assert(
+        history.json[0]?.totalTokens === 18,
+        `Unexpected history item: ${JSON.stringify(history.json)}`
+      );
+      assert(
+        history.json[0]?.totalCostMicros === EXPECTED_TOTAL_COST_MICROS,
+        `Unexpected history cost: ${JSON.stringify(history.json)}`
+      );
+      assert(
+        history.json[0]?.provider === 'gemini',
+        `Unexpected history item: ${JSON.stringify(history.json)}`
       );
 
       const requestItem = await waitForAuditRequest(
         traceId,
         cookie,
-        (item) => item.status === 'completed'
+        (item) => item.status === 'completed' && item.totalCostMicros === EXPECTED_TOTAL_COST_MICROS
       );
       assert(
         requestItem.endpoint === 'gemini_contents',
@@ -281,13 +368,67 @@ async function runHappyPathScenario() {
         requestItem.httpStatus === 200,
         `Unexpected httpStatus: ${JSON.stringify(requestItem)}`
       );
+      assert(
+        requestItem.inputTokens === 10,
+        `Unexpected inputTokens: ${JSON.stringify(requestItem)}`
+      );
+      assert(
+        requestItem.outputTokens === 8,
+        `Unexpected outputTokens: ${JSON.stringify(requestItem)}`
+      );
+      assert(
+        requestItem.totalTokens === 18,
+        `Unexpected totalTokens: ${JSON.stringify(requestItem)}`
+      );
+      assert(
+        requestItem.totalCostMicros === EXPECTED_TOTAL_COST_MICROS,
+        `Unexpected totalCostMicros: ${JSON.stringify(requestItem)}`
+      );
+
+      const analytics = await requestJson(
+        '/trpc/admin.analytics.summary',
+        { method: 'GET' },
+        cookie
+      );
+      assert(analytics.response.ok, `Analytics failed: ${JSON.stringify(analytics.json)}`);
+      const analyticsData = analytics.json?.result?.data;
+      assert(
+        analyticsData?.totalCostMicros === EXPECTED_TOTAL_COST_MICROS,
+        `Unexpected analytics cost: ${JSON.stringify(analytics.json)}`
+      );
+      const endpointItem = analyticsData?.endpointBreakdown?.find(
+        (item) => item.endpoint === 'gemini_contents'
+      );
+      assert(
+        endpointItem?.totalCostMicros === EXPECTED_TOTAL_COST_MICROS,
+        `Unexpected endpoint cost: ${JSON.stringify(analytics.json)}`
+      );
+      const channelItem = analyticsData?.channelBreakdown?.find(
+        (item) => item.channelId === channelId
+      );
+      assert(
+        channelItem?.totalCostMicros === EXPECTED_TOTAL_COST_MICROS,
+        `Unexpected channel cost: ${JSON.stringify(analytics.json)}`
+      );
+      assert(
+        channelItem?.provider === 'gemini',
+        `Unexpected channel provider: ${JSON.stringify(analytics.json)}`
+      );
 
       return {
         scenario: 'happy-path',
         traceId,
         text: streamedText,
         finishReason: finalEvent.candidates[0].finishReason,
-        requestStatus: requestItem.status,
+        usageMetadata: finalEvent.usageMetadata,
+        overviewUsage: overview.json.usage,
+        historyUsage: history.json[0],
+        auditUsage: requestItem,
+        analyticsUsage: {
+          summary: analyticsData,
+          endpoint: endpointItem,
+          channel: channelItem,
+        },
       };
     }
   );
