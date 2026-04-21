@@ -14,7 +14,11 @@ import {
   redirect,
   useNavigate,
 } from '@tanstack/react-router';
-import { channelProviderProtocolMap, channelProviderRecommendedModels } from '@uhub/shared';
+import {
+  channelProviderDefaultBaseUrlMap,
+  channelProviderProtocolMap,
+  channelProviderRecommendedModels,
+} from '@uhub/shared';
 import type {
   AnalyticsSummary,
   ApiKey,
@@ -51,7 +55,7 @@ const initialChannelForm: CreateChannelInput = {
   name: '',
   provider: 'openai',
   protocol: 'openai_chat_completions',
-  baseUrl: 'https://example.com',
+  baseUrl: channelProviderDefaultBaseUrlMap.openai,
   models: [],
   defaultTestModel: null,
   status: 'active',
@@ -88,6 +92,16 @@ function parseModelsInput(value: string) {
 
 function mergeModels(currentModels: string[], nextModels: string[]) {
   return Array.from(new Set([...currentModels, ...nextModels]));
+}
+
+function resolveNextBaseUrl(
+  currentProvider: ChannelProvider,
+  nextProvider: ChannelProvider,
+  currentBaseUrl: string
+) {
+  return currentBaseUrl === channelProviderDefaultBaseUrlMap[currentProvider]
+    ? channelProviderDefaultBaseUrlMap[nextProvider]
+    : currentBaseUrl;
 }
 
 function parseExpiresAtInput(value: string) {
@@ -574,6 +588,7 @@ function ChannelsPage() {
                 ...current,
                 provider,
                 protocol: channelProviderProtocolMap[provider],
+                baseUrl: resolveNextBaseUrl(current.provider, provider, current.baseUrl),
                 defaultTestModel: null,
               }));
               setModelsInput('');

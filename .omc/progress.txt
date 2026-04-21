@@ -229,3 +229,17 @@
 - Learnings:
   - 这条 admin UX 的真实风险不在 schema，而在“provider 切换后的脏表单状态”；如果不在切换点清空，用户很容易提交跨 provider 的无效模型组合。
   - Better Auth 在本项目的本地浏览器流里需要显式 `trustedOrigins`；否则即使 curl/集成 helper 能成功登录，浏览器仍会因 `INVALID_ORIGIN` 返回 403。
+
+### Provider-aware upstream preset（admin 上游默认值微增强）
+- `packages/shared/src/schemas/channels.ts` 新增 `channelProviderDefaultBaseUrlMap`，为 `openai / anthropic / gemini` 提供最小默认 upstream base URL。
+- `apps/admin-web/src/app.tsx` 的 channel 初始表单默认使用 `openai` 对应的默认 base URL，而不再是占位 `https://example.com`。
+- `apps/admin-web/src/app.tsx` 在切换 provider 时，若当前 `baseUrl` 仍是旧 provider 的默认值，则自动替换为新 provider 的默认值；若用户已手改为自定义 upstream，则保留该值，不强行覆盖。
+- 最新验证结果：
+  - `bun --cwd apps/admin-web typecheck` 通过
+  - `bun run check` 通过
+  - 浏览器真实验证通过：openai 初始 `Upstream Base URL` 为 `https://api.openai.com`
+  - 浏览器真实验证通过：切到 anthropic 后，`Upstream Base URL` 自动变为 `https://api.anthropic.com`
+  - 浏览器真实验证通过：手工改成 `https://custom-upstream.example.com` 后切到 gemini，该自定义值保持不变
+- Learnings:
+  - provider-aware admin 表单不只需要模型 preset，也需要 upstream preset；否则用户仍要从占位 URL 手动改到真实 provider base URL。
+  - “只在当前值仍是默认值时自动替换” 比每次切 provider 都强制覆盖更稳，既保留引导能力，也不破坏用户输入。

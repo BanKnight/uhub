@@ -18,6 +18,12 @@ export const channelProviderProtocolMap: Record<ChannelProvider, ChannelProtocol
   gemini: 'gemini_contents',
 };
 
+export const channelProviderDefaultBaseUrlMap: Record<ChannelProvider, string> = {
+  openai: 'https://api.openai.com',
+  anthropic: 'https://api.anthropic.com',
+  gemini: 'https://generativelanguage.googleapis.com',
+};
+
 export const channelProviderRecommendedModels: Record<ChannelProvider, string[]> = {
   openai: ['gpt-4o-mini', 'gpt-4o'],
   anthropic: [
