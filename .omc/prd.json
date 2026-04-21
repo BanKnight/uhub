@@ -1,27 +1,25 @@
 {
   "stories": [
     {
-      "id": "NEG-US1",
-      "title": "新增 admin structured channel 负向 contract 集成入口",
+      "id": "AGG-US1",
+      "title": "为 admin structured channel contract 新增稳定聚合入口",
       "priority": 1,
       "passes": true,
       "acceptanceCriteria": [
-        "新增一个最小自包含的 admin structured channel 负向 integration 脚本，只覆盖现有 schema 已声明的边界，不修改 runtime 代码",
-        "根 `package.json` 新增对应 `bun run` 入口与 `:local` 入口，继续复用 `tests/run-with-local-worker.ts`",
-        "负向脚本至少覆盖：provider/protocol mismatch 在 `admin.channels.create` 被拒绝、provider/protocol mismatch 在 `admin.channels.update` 被拒绝、defaultTestModel 不在 models 中时 `admin.channels.create` 被拒绝",
-        "断言失败响应为非 2xx，且错误消息能区分协议不兼容与 defaultTestModel 非法两类边界"
+        "`package.json` 新增 `test:integration:admin`，只聚合现有 `test:integration:admin:channel-structured` 与 `test:integration:admin:channel-structured:invalid` 两条脚本",
+        "`package.json` 新增 `test:integration:admin:local`，并继续通过 `tests/run-with-local-worker.ts` 包装 `test:integration:admin`",
+        "本轮改动不扩大默认 smoke 集合，不修改 runtime 业务代码，也不改已有测试逻辑"
       ]
     },
     {
-      "id": "NEG-US2",
-      "title": "验证 admin structured channel 负向 contract 并记录结果",
+      "id": "AGG-US2",
+      "title": "验证 admin 聚合入口并记录结果",
       "priority": 2,
       "passes": true,
       "acceptanceCriteria": [
-        "运行 `bun run --cwd /data/workspace/uhub test:integration:admin:channel-structured:invalid:local` 通过",
-        "本轮改动只落在 `package.json`、新的/相关的 integration 测试文件、`.omc/prd.json`、`.omc/progress.txt` 等测试或元数据文件，不触碰 runtime 业务代码",
-        "`.omc/progress.txt` 追加记录本轮负向 contract coverage 的实现、验证结果与 learnings",
-        "git working tree 中不残留与已放弃方案相关的额外噪音"
+        "运行 `bun run --cwd /data/workspace/uhub test:integration:admin:local` 通过",
+        "`.omc/progress.txt` 追加记录本轮 admin 聚合入口的实现、验证结果与 learnings",
+        "git working tree 中仅包含本轮聚合入口相关的 `package.json` / `.omc` 元数据改动，不残留已放弃方案噪音"
       ]
     }
   ]

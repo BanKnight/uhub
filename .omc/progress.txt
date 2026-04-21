@@ -265,3 +265,15 @@
 - Learnings:
   - 负向 contract 最适合拆成独立脚本，而不是塞进 happy-path；这样 smoke/CI 组合更干净，失败定位也更直接。
   - 当前 schema 的真实边界是：create 同时校验 protocol/provider 与 defaultTestModel，update 只校验 protocol/provider；测试应忠实锁定现状，而不是把未来想要的行为提前写成必过断言。
+
+### Admin structured channel aggregate entrypoint（当前收口）
+- `package.json` 新增 `test:integration:admin`，只聚合现有 `test:integration:admin:channel-structured` 与 `test:integration:admin:channel-structured:invalid` 两条脚本。
+- `package.json` 新增 `test:integration:admin:local`，继续通过 `tests/run-with-local-worker.ts` 包装 `test:integration:admin`，不引入新的 runner。
+- 本轮未扩大默认 `test:integration:smoke:raw` 集合，未修改 runtime 业务代码，也未改已有测试逻辑。
+- 最新验证结果：
+  - `bun run --cwd /data/workspace/uhub test:integration:admin:local` 通过
+  - 聚合入口按顺序跑通 positive + invalid 两条 admin structured channel contract 脚本
+  - 当前工作树仅包含本轮聚合入口相关的 `package.json` / `.omc` 元数据改动
+- Learnings:
+  - 当 leaf integration 脚本已经稳定存在时，优先补一个 `bun run` 聚合入口是最低 blast radius 的收口方式，不需要再扩 runtime 或测试 harness。
+  - admin/product 面回归可以先通过独立聚合入口沉淀，保持可复跑性，同时避免过早把默认 smoke 集合做大。

@@ -62,6 +62,8 @@
     "test:integration:admin:channel-structured:local": "bun tests/run-with-local-worker.ts bun tests/integration/admin-channel-structured.ts",
     "test:integration:admin:channel-structured:invalid": "bun tests/integration/admin-channel-structured-invalid.ts",
     "test:integration:admin:channel-structured:invalid:local": "bun tests/run-with-local-worker.ts bun tests/integration/admin-channel-structured-invalid.ts",
+    "test:integration:admin": "bun run test:integration:admin:channel-structured && bun run test:integration:admin:channel-structured:invalid",
+    "test:integration:admin:local": "bun tests/run-with-local-worker.ts bun run test:integration:admin",
     "test:integration:portal:overview-quota": "bun tests/integration/portal-overview-quota.ts",
     "test:integration:portal:overview-quota:local": "bun tests/run-with-local-worker.ts bun tests/integration/portal-overview-quota.ts",
     "test:integration:ci:local": "bun tests/run-with-local-worker.ts bun run test:integration:ci:raw",
