@@ -214,17 +214,18 @@
   - 本地默认 integration 失败的直接原因不是 token truth 逻辑回归，而是当前 worker admin 凭据与测试默认 `admin@example.com/admin123456` 不一致；切到 CI 那组 `ci-admin@example.com/ci-admin-password-123` 后，OpenAI/portal/Anthropic 相关窄验证恢复通过
   - Anthropic stream tool_use / multi-stream tool_use 测试已同步到“usage 真值缺失时返回 null”契约，避免继续断言旧的估算 token 行为
 
-### Phase 2/3 收口（token truth + admin 结构化配置增强）
-- token usage 真值契约已冻结到单一持久层：上游提供 usage 时持久化真实 input/output/total token；缺失 usage 时统一返回 `null/unavailable`，不再写入估算 token。
-- `tests/integration/portal-overview-quota.ts` 已验证 portal overview 的 quota/token 读取口径与后端契约一致，语义上继续区分 quota 与 token usage。
-- `apps/admin-web/src/app.tsx` 已补齐 channel 的结构化 create/edit/status 流程，围绕 `provider/protocol/baseUrl/models/status` 工作，并继续兼容 legacy `configJson` 展示。
-- `tests/integration/_anthropic.ts` 新增 `listChannels()`、`updateChannel()`、`updateChannelStatus()`，供 admin 结构化回归复用。
-- 新增 `tests/integration/admin-channel-structured.ts`，覆盖 channel 的 create -> list -> update(disabled) -> list -> status(active) -> list 闭环，验证结构化字段与兼容读取路径。
-- 根 `package.json` 新增 `test:integration:admin:channel-structured`，并收口到 `test:integration:openai`，让 admin 结构化回归进入统一 integration 入口。
-- `packages/shared/package.json` 已补上 `main/module/types/exports` 指向 `dist/index.*`，修复 admin-web 开始 runtime import `@uhub/shared` 后暴露的 Vite resolver 问题。
+### Provider-aware channel model UX hardening（admin 结构化录入收口）
+- `packages/shared/src/schemas/channels.ts` 新增 `channelProviderRecommendedModels`，为 `openai / anthropic / gemini` 提供最小推荐模型 catalog，继续沿用现有 `models + defaultTestModel` contract，不改 runtime。
+- `apps/admin-web/src/app.tsx` 的 channel 表单新增 provider-aware quick-add / remove 交互；`defaultTestModel` 继续只从当前 `models` 派生。
+- `apps/admin-web/src/app.tsx` 在切换 provider 时同步重置 `modelsInput` 与 `defaultTestModel`，避免把上一个 provider 的模型残留到当前表单。
+- `apps/api-worker/src/auth/better-auth.ts` 为 Better Auth 显式补 `baseURL` 与 `trustedOrigins(['http://localhost:5173', 'http://127.0.0.1:5173'])`，修复本地浏览器登录 `INVALID_ORIGIN` 403。
 - 最新验证结果：
-  - `bun tests/integration/admin-channel-structured.ts` 返回 `status: ok`，并确认 channel 从 `active -> disabled -> active` 变化正确
-  - `bun tests/integration/portal-overview-quota.ts` 返回真实 token/quota 数据（`inputTokens=9`、`outputTokens=4`、`totalTokens=13`、`tokenUsageAvailability=available`）
-  - `bun run format:check && bun run lint && bun run typecheck && bun run build` 成功
-
-
+  - `bun --cwd apps/api-worker typecheck` 通过
+  - `bun --cwd apps/admin-web typecheck` 通过
+  - 浏览器真实验证通过：标准 Better Auth 登录可进入 `/`，channel 表单可看到 provider-aware quick-add 候选
+  - 浏览器真实验证通过：从 openai 加入 `gpt-4o-mini` 后切到 anthropic，会清空旧模型与 `defaultTestModel`
+  - 浏览器真实验证通过：创建 `provider-aware-final` anthropic channel 后，列表正确显示 `Models: claude-3-5-sonnet-latest` 与 `Default Test Model: claude-3-5-sonnet-latest`
+  - 浏览器真实验证通过：点击已创建 channel 的 `Edit` 后，表单进入编辑态并正确回填 anthropic provider / selected model / default test model
+- Learnings:
+  - 这条 admin UX 的真实风险不在 schema，而在“provider 切换后的脏表单状态”；如果不在切换点清空，用户很容易提交跨 provider 的无效模型组合。
+  - Better Auth 在本项目的本地浏览器流里需要显式 `trustedOrigins`；否则即使 curl/集成 helper 能成功登录，浏览器仍会因 `INVALID_ORIGIN` 返回 403。

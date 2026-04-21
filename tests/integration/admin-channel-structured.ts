@@ -43,6 +43,7 @@ async function main() {
         protocol: 'openai_chat_completions',
         baseUrl,
         models: ['gpt-4o-mini'],
+        defaultTestModel: 'gpt-4o-mini',
       });
 
       const createdList = await listChannels(cookie);
@@ -59,6 +60,10 @@ async function main() {
         `Unexpected models: ${JSON.stringify(created)}`
       );
       assert(
+        created.defaultTestModel === 'gpt-4o-mini',
+        `Unexpected defaultTestModel: ${JSON.stringify(created)}`
+      );
+      assert(
         created.gatewayHealthStatus === 'healthy' && created.gatewayUnhealthyUntil === null,
         `Unexpected gateway health: ${JSON.stringify(created)}`
       );
@@ -70,6 +75,7 @@ async function main() {
         protocol: 'openai_chat_completions',
         baseUrl,
         models: ['gpt-4o-mini', 'gpt-4o'],
+        defaultTestModel: 'gpt-4o',
         status: 'disabled',
       });
 
@@ -81,6 +87,10 @@ async function main() {
       assert(
         JSON.stringify(updated.models) === JSON.stringify(['gpt-4o-mini', 'gpt-4o']),
         `Unexpected update models: ${JSON.stringify(updated)}`
+      );
+      assert(
+        updated.defaultTestModel === 'gpt-4o',
+        `Unexpected updated defaultTestModel: ${JSON.stringify(updated)}`
       );
       assert(
         updated.gatewayHealthStatus === 'healthy' && updated.gatewayUnhealthyUntil === null,
@@ -102,6 +112,25 @@ async function main() {
         JSON.stringify(updatedFromList.models) === JSON.stringify(['gpt-4o-mini', 'gpt-4o']),
         `Unexpected listed models: ${JSON.stringify(updatedFromList)}`
       );
+      assert(
+        updatedFromList.defaultTestModel === 'gpt-4o',
+        `Unexpected listed defaultTestModel: ${JSON.stringify(updatedFromList)}`
+      );
+
+      const cleared = await updateChannel(cookie, {
+        id: channelId,
+        name: `${name}-cleared`,
+        provider: 'openai',
+        protocol: 'openai_chat_completions',
+        baseUrl,
+        models: ['gpt-4o-mini'],
+        defaultTestModel: 'gpt-4o',
+        status: 'active',
+      });
+      assert(
+        cleared.defaultTestModel === null,
+        `Expected defaultTestModel to clear: ${JSON.stringify(cleared)}`
+      );
 
       const reactivated = await updateChannelStatus(cookie, {
         id: channelId,
@@ -117,6 +146,10 @@ async function main() {
       assert(
         reactivatedFromList?.status === 'active',
         `Unexpected reactivated listed status: ${JSON.stringify(reactivatedFromList)}`
+      );
+      assert(
+        reactivatedFromList?.defaultTestModel === null,
+        `Unexpected reactivated defaultTestModel: ${JSON.stringify(reactivatedFromList)}`
       );
       assert(
         reactivatedFromList?.gatewayHealthStatus === 'healthy' &&

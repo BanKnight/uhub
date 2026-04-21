@@ -1,63 +1,64 @@
 {
   "stories": [
     {
-      "id": "P0-US1",
-      "title": "冻结三协议 canonical contract 与 usage parity",
+      "id": "DTM-US1",
+      "title": "为 defaultTestModel 写失败的结构化 channel 集成断言",
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
-        "openai / anthropic / gemini 的共享 request/response/error/usage 最小 contract 在 shared schema、worker 路由与现有测试断言中保持一致，不再新增自由协议字段或自由写入路径",
-        "`configJson` 只保留兼容读取/展示：schema、worker、admin-web 与 integration 测试中不得新增依赖它的写入语义，也不执行删除",
-        "portal/admin 现有读面继续使用当前 nested usage/quota 与现有字段口径；portal history 只证明已有字段一致性，不额外扩面",
-        "`bun run test:integration:ci`、`bun run test:e2e:core`、`bun run check` 在当前分支通过，且三协议 integration 与 portal/admin 现有回归能写死断言状态码、canonical body、usage/token availability、request log 入库、channel/quota/structured 配置读面一致"
+        "tests/integration/admin-channel-structured.ts 覆盖 create/update/list 的 defaultTestModel 读写断言",
+        "tests/integration/admin-channel-structured.ts 覆盖 models 变更导致 defaultTestModel 自动清空为 null 的断言",
+        "tests/integration/_anthropic.ts 的 createChannel/updateChannel/listChannels/updateChannelStatus 类型和 payload 支持 defaultTestModel",
+        "运行 bun tests/run-with-local-worker.ts bun run test:integration:admin:channel-structured 时，失败点落在 defaultTestModel 尚未被后端实现，而不是测试语法或 helper 结构错误"
       ]
     },
     {
-      "id": "P1-US1",
-      "title": "硬化 core e2e 与 portal/admin 主链路",
+      "id": "DTM-US2",
+      "title": "新增 defaultTestModel 存储与 shared contract",
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
-        "`tests/integration/portal-overview-quota.ts`、`tests/integration/admin-channel-structured.ts`、`tests/e2e/core-flow.ts` 覆盖 portal/admin 主链路的 channel/quota/structured 配置一致性",
-        "admin 创建 channel/key、gateway 调用、portal 展示的闭环在 `tests/e2e/core-flow.ts` 中稳定成立，运行过程中无新增 5xx",
-        "本地重复复跑 `bun run test:integration:openai`、`bun run test:integration:anthropic`、`bun run test:integration:gemini`、`bun run test:e2e:core`、`bun run check` 稳定通过",
-        "`.github/workflows/ci.yml` 继续以 `quality`、`integration-openai`、`integration-anthropic`、`integration-gemini`、`e2e-core` 作为质量门，并与本地 bun 入口保持一致"
+        "packages/db/migrations 中新增 channel default_test_model nullable 列 migration",
+        "apps/api-worker/src/db/schema.ts 的 channels schema 包含 defaultTestModel",
+        "packages/shared/src/schemas/channels.ts 的 Channel / create / update contract 包含 defaultTestModel: string | null",
+        "shared schema 校验 defaultTestModel 为空或属于 models"
       ]
     },
     {
-      "id": "P2-US1",
-      "title": "基线化 anthropic failover 与 tracing/health",
+      "id": "DTM-US3",
+      "title": "在 worker channel service 中持久化并归一化 defaultTestModel",
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
-        "`tests/integration/anthropic-gateway-failover.ts` 覆盖 anthropic 可重试失败后切换成功的主锚场景，不新增 openai/gemini failover 语义",
-        "anthropic failover 的触发条件、request log 字段、channel unhealthy cooldown/恢复在 worker 与 admin audit/request-log 读面上可观测",
-        "openai、anthropic、gemini 三协议响应都返回 `x-trace-id`，相关 integration 断言会校验该头与读面 trace 一致性",
-        "`bun run test:integration:anthropic` 稳定通过，且不会破坏现有 openai/gemini 主链路集成与 admin audit/request-log 可观测回归"
+        "apps/api-worker/src/services/channels.ts 的 toChannel/createChannel/updateChannel 返回和持久化 defaultTestModel",
+        "updateChannel 在 models 不再包含当前 defaultTestModel 时将其归一化为 null",
+        "apps/api-worker/src/services/gateway/channels.ts 与 apps/api-worker/src/routers/gateway/proxy-request.ts 不读取 defaultTestModel"
       ]
     },
     {
-      "id": "P3-US1",
-      "title": "新增 cost tracking 持久化、聚合与展示",
+      "id": "DTM-US4",
+      "title": "在 admin-web 中提供 defaultTestModel 下拉和列表展示",
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
-        "request log 持久化层新增 cost 字段，并与现有 token truth / usage contract 分离，不把 quota 混成 token/cost",
-        "analytics summary 与 portal/admin 展示新增 cost 聚合字段，命名与口径在 shared schema、worker 返回与 UI 展示中保持一致",
-        "openai、anthropic、gemini 至少各有 1 条样例从 cost 采集贯通到 request log、analytics、portal/admin 展示",
-        "新增 cost tracking 后，`bun run test:integration`、`bun run test:e2e:core`、`bun run check` 通过"
+        "apps/admin-web/src/app.tsx 的 channel form state 包含 defaultTestModel",
+        "defaultTestModel 使用基于当前 models 的下拉候选录入，允许空值",
+        "当 models 变更导致当前 defaultTestModel 失效时，admin-web 自动清空该值",
+        "channel 列表展示 Default Test Model，编辑时可正确回填 defaultTestModel"
       ]
     },
     {
-      "id": "P4-US1",
-      "title": "补齐共享 channel 选择与 load balance 基线",
+      "id": "DTM-US5",
+      "title": "通过 defaultTestModel 全量验证并保持主链路稳定",
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
-        "gateway/service 层实现共享 channel 选择与基础负载均衡，只围绕 openai/anthropic/gemini，不引入新的 provider 级语义",
-        "选择结果、回退原因与最终命中 channel 在 tracing / request log / audit 中可追踪、可解释",
-        "load balance 变更不会破坏现有 quota、logging、tracing 与 portal/admin 主链路读面",
-        "新增定向 smoke 后，现有质量门与相关本地 bun 入口继续通过"
+        "bun tests/run-with-local-worker.ts bun run test:integration:admin:channel-structured 通过",
+        "bun tests/run-with-local-worker.ts bun run test:integration:openai 通过",
+        "bun run test:integration:ci 通过",
+        "bun run check 通过",
+        "docs/plans/2026-04-20-default-test-model-design.md 与 .omc/plans/2026-04-20-default-test-model-implementation-plan.md 保持为本次实现依据",
+        "progress.txt 记录本轮 defaultTestModel 的实现细节与 learnings"
       ]
     }
   ]

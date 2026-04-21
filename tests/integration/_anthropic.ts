@@ -97,6 +97,7 @@ export async function createChannel(
     provider?: 'openai' | 'anthropic' | 'gemini';
     protocol?: 'openai_chat_completions' | 'anthropic_messages' | 'gemini_contents';
     models?: string[];
+    defaultTestModel?: string | null;
     status?: 'active' | 'disabled';
   }
 ) {
@@ -111,6 +112,7 @@ export async function createChannel(
         protocol,
         baseUrl: input.baseUrl,
         models: input.models ?? [],
+        defaultTestModel: input.defaultTestModel ?? null,
         status: input.status ?? 'active',
       }),
     },
@@ -165,6 +167,7 @@ export async function listChannels(cookie: string) {
     protocol: string;
     baseUrl: string;
     models: string[];
+    defaultTestModel: string | null;
     status: string;
   }>;
 }
@@ -178,6 +181,7 @@ export async function updateChannel(
     protocol: 'openai_chat_completions' | 'anthropic_messages' | 'gemini_contents';
     baseUrl: string;
     models?: string[];
+    defaultTestModel?: string | null;
     status?: 'active' | 'disabled';
   }
 ) {
@@ -192,6 +196,7 @@ export async function updateChannel(
         protocol: input.protocol,
         baseUrl: input.baseUrl,
         models: input.models ?? [],
+        defaultTestModel: input.defaultTestModel ?? null,
         status: input.status ?? 'active',
       }),
     },
@@ -207,6 +212,7 @@ export async function updateChannel(
     protocol: string;
     baseUrl: string;
     models: string[];
+    defaultTestModel: string | null;
     status: string;
   };
 }
@@ -239,6 +245,7 @@ export async function updateChannelStatus(
     protocol: string;
     baseUrl: string;
     models: string[];
+    defaultTestModel: string | null;
     status: string;
   };
 }

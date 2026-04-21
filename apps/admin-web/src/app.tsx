@@ -14,7 +14,7 @@ import {
   redirect,
   useNavigate,
 } from '@tanstack/react-router';
-import { channelProviderProtocolMap } from '@uhub/shared';
+import { channelProviderProtocolMap, channelProviderRecommendedModels } from '@uhub/shared';
 import type {
   AnalyticsSummary,
   ApiKey,
@@ -53,6 +53,7 @@ const initialChannelForm: CreateChannelInput = {
   protocol: 'openai_chat_completions',
   baseUrl: 'https://example.com',
   models: [],
+  defaultTestModel: null,
   status: 'active',
 };
 const initialApiKeyForm: CreateApiKeyInput = {
@@ -83,6 +84,10 @@ function parseModelsInput(value: string) {
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function mergeModels(currentModels: string[], nextModels: string[]) {
+  return Array.from(new Set([...currentModels, ...nextModels]));
 }
 
 function parseExpiresAtInput(value: string) {
@@ -489,6 +494,20 @@ function ChannelsPage() {
   const channels = channelsQuery.data ?? [];
   const activeChannels = channels.filter((channel) => channel.status === 'active');
   const apiKeys = apiKeysQuery.data ?? [];
+  const modelOptions = React.useMemo(() => parseModelsInput(modelsInput), [modelsInput]);
+  const recommendedModels = channelProviderRecommendedModels[form.provider];
+
+  React.useEffect(() => {
+    setForm((current) => {
+      if (current.defaultTestModel === null) {
+        return current;
+      }
+
+      return modelOptions.includes(current.defaultTestModel)
+        ? current
+        : { ...current, defaultTestModel: null };
+    });
+  }, [modelOptions]);
 
   return (
     <section>
@@ -518,7 +537,11 @@ function ChannelsPage() {
           event.preventDefault();
           const payload = {
             ...form,
-            models: parseModelsInput(modelsInput),
+            models: modelOptions,
+            defaultTestModel:
+              form.defaultTestModel !== null && modelOptions.includes(form.defaultTestModel)
+                ? form.defaultTestModel
+                : null,
           };
 
           if (editingChannelId) {
@@ -551,7 +574,9 @@ function ChannelsPage() {
                 ...current,
                 provider,
                 protocol: channelProviderProtocolMap[provider],
+                defaultTestModel: null,
               }));
+              setModelsInput('');
             }}
           >
             {providerOptions.map((provider) => (
@@ -595,13 +620,73 @@ function ChannelsPage() {
           </select>
         </div>
         <div>
+          <p>Quick Add Models</p>
+          <div>
+            {recommendedModels.map((model) => (
+              <button
+                key={model}
+                type="button"
+                disabled={modelOptions.includes(model)}
+                onClick={() =>
+                  setModelsInput((current) =>
+                    mergeModels(parseModelsInput(current), [model]).join(', ')
+                  )
+                }
+              >
+                {model}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
           <label htmlFor="channel-models">Allowed Models</label>
           <input
             id="channel-models"
             value={modelsInput}
             onChange={(event) => setModelsInput(event.target.value)}
-            placeholder="gpt-4o-mini, claude-3-5-sonnet, gemini-2.5-flash"
+            placeholder="Type custom model IDs as comma-separated values"
           />
+        </div>
+        <div>
+          <p>Selected Models</p>
+          {modelOptions.length === 0 ? <p>No models selected.</p> : null}
+          <div>
+            {modelOptions.map((model) => (
+              <button
+                key={model}
+                type="button"
+                onClick={() =>
+                  setModelsInput((current) =>
+                    parseModelsInput(current)
+                      .filter((item) => item !== model)
+                      .join(', ')
+                  )
+                }
+              >
+                Remove {model}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <label htmlFor="channel-default-test-model">Default Test Model</label>
+          <select
+            id="channel-default-test-model"
+            value={form.defaultTestModel ?? ''}
+            onChange={(event) =>
+              setForm((current) => ({
+                ...current,
+                defaultTestModel: event.target.value || null,
+              }))
+            }
+          >
+            <option value="">None</option>
+            {modelOptions.map((model) => (
+              <option key={model} value={model}>
+                {model}
+              </option>
+            ))}
+          </select>
         </div>
         <button
           type="submit"
@@ -647,6 +732,7 @@ function ChannelsPage() {
               <div>Protocol: {channel.protocol}</div>
               <div>Upstream Base URL: {channel.baseUrl}</div>
               <div>Models: {channel.models.length > 0 ? channel.models.join(', ') : 'n/a'}</div>
+              <div>Default Test Model: {channel.defaultTestModel ?? 'n/a'}</div>
               {channel.configJson !== '{}' ? (
                 <div>Legacy configJson: {channel.configJson}</div>
               ) : null}
@@ -668,6 +754,7 @@ function ChannelsPage() {
                       protocol: channel.protocol,
                       baseUrl: channel.baseUrl,
                       models: channel.models,
+                      defaultTestModel: channel.defaultTestModel,
                       status: channel.status,
                     });
                     setModelsInput(channel.models.join(', '));

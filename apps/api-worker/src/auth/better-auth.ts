@@ -104,6 +104,8 @@ export async function ensureAdminAccount(
 
 export function createAuth(db: DrizzleD1Database<typeof schema>) {
   return betterAuth({
+    baseURL: 'http://localhost:8787',
+    trustedOrigins: ['http://localhost:5173', 'http://127.0.0.1:5173'],
     database: drizzleAdapter(db, {
       provider: 'sqlite',
       schema,

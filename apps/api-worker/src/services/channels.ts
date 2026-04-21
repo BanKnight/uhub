@@ -30,6 +30,7 @@ function toChannel(row: typeof channels.$inferSelect): Channel {
     protocol: row.protocol,
     baseUrl: row.baseUrl,
     models: parseModels(row.modelsJson),
+    defaultTestModel: row.defaultTestModel,
     status: row.status,
     gatewayHealthStatus: gatewayHealth.gatewayHealthStatus,
     gatewayUnhealthyUntil: gatewayHealth.gatewayUnhealthyUntil,
@@ -60,6 +61,7 @@ export async function createChannel(
     protocol: input.protocol,
     baseUrl: input.baseUrl,
     modelsJson: JSON.stringify(input.models),
+    defaultTestModel: input.defaultTestModel,
     status: input.status,
     configJson: '{}',
     createdAt: now,
@@ -81,6 +83,11 @@ export async function updateChannel(
     return undefined;
   }
 
+  const normalizedDefaultTestModel =
+    input.defaultTestModel !== null && input.models.includes(input.defaultTestModel)
+      ? input.defaultTestModel
+      : null;
+
   await db
     .update(channels)
     .set({
@@ -89,6 +96,7 @@ export async function updateChannel(
       protocol: input.protocol,
       baseUrl: input.baseUrl,
       modelsJson: JSON.stringify(input.models),
+      defaultTestModel: normalizedDefaultTestModel,
       status: input.status,
       configJson: existingRow.configJson,
       updatedAt: Date.now(),

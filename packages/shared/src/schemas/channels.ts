@@ -18,6 +18,16 @@ export const channelProviderProtocolMap: Record<ChannelProvider, ChannelProtocol
   gemini: 'gemini_contents',
 };
 
+export const channelProviderRecommendedModels: Record<ChannelProvider, string[]> = {
+  openai: ['gpt-4o-mini', 'gpt-4o'],
+  anthropic: [
+    'claude-3-5-sonnet-latest',
+    'claude-3-5-sonnet-20241022',
+    'claude-3-5-sonnet-20240620',
+  ],
+  gemini: ['gemini-2.5-flash'],
+};
+
 function assertChannelProviderProtocol(
   input: { provider: ChannelProvider; protocol: ChannelProtocol },
   ctx: z.RefinementCtx
@@ -33,6 +43,25 @@ function assertChannelProviderProtocol(
   });
 }
 
+function assertDefaultTestModelInModels(
+  input: { models: string[]; defaultTestModel: string | null },
+  ctx: z.RefinementCtx
+) {
+  if (input.defaultTestModel === null) {
+    return;
+  }
+
+  if (input.models.includes(input.defaultTestModel)) {
+    return;
+  }
+
+  ctx.addIssue({
+    code: z.ZodIssueCode.custom,
+    path: ['defaultTestModel'],
+    message: 'defaultTestModel must be included in models',
+  });
+}
+
 export const channelSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -40,6 +69,7 @@ export const channelSchema = z.object({
   protocol: channelProtocolSchema,
   baseUrl: z.string(),
   models: z.array(z.string()),
+  defaultTestModel: z.string().nullable(),
   status: channelStatusSchema,
   gatewayHealthStatus: gatewayChannelHealthStatusSchema,
   gatewayUnhealthyUntil: z.number().int().nullable(),
@@ -62,18 +92,22 @@ const baseChannelInputSchema = z.object({
   protocol: channelProtocolSchema,
   baseUrl: z.string().url(),
   models: z.array(z.string().min(1)).default([]),
+  defaultTestModel: z.string().nullable().default(null),
   status: channelStatusSchema.default('active'),
 });
 
-export const createChannelInputSchema = baseChannelInputSchema.superRefine(
-  assertChannelProviderProtocol
-);
+export const createChannelInputSchema = baseChannelInputSchema.superRefine((input, ctx) => {
+  assertChannelProviderProtocol(input, ctx);
+  assertDefaultTestModelInModels(input, ctx);
+});
 
 export const updateChannelInputSchema = baseChannelInputSchema
   .extend({
     id: z.string().min(1),
   })
-  .superRefine(assertChannelProviderProtocol);
+  .superRefine((input, ctx) => {
+    assertChannelProviderProtocol(input, ctx);
+  });
 
 export const updateChannelStatusInputSchema = z.object({
   id: z.string().min(1),

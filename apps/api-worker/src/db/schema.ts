@@ -60,6 +60,7 @@ export const channels = sqliteTable('channels', {
   }).notNull(),
   baseUrl: text('base_url').notNull(),
   modelsJson: text('models_json').notNull(),
+  defaultTestModel: text('default_test_model'),
   status: text('status', { enum: ['active', 'disabled'] }).notNull(),
   configJson: text('config_json').notNull(),
   createdAt: integer('created_at').notNull(),
