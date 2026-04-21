@@ -302,3 +302,16 @@
 - Learnings:
   - 当 admin coverage 已经通过独立 `test:integration:admin` 聚合入口沉淀后，CI 最稳的挂载点是单独 job，而不是重新寄生回 provider job。
   - 这一层修的是 workflow 编排，不是 runtime 能力；验证应优先围绕 `bun run` 入口与 workflow 文本对齐来取证。
+
+### CI gemini artifacts explicit upload（当前收口）
+- `.github/workflows/ci.yml` 为已有 `integration-gemini` job 补上独立 `Upload Gemini artifacts` 步骤，继续保持 `needs: quality` 不变。
+- `Run Gemini integration suite` 仍显式执行 `UHUB_ARTIFACTS_DIR=artifacts bun run test:integration:gemini:local`，新增步骤通过 `actions/upload-artifact@v4` 上传 `gemini-integration-artifacts`。
+- 本轮保持最小 blast radius：只改真实 workflow 与 `.omc` 元数据，不触碰 runtime，也未改已有测试逻辑。
+- 最新验证结果：
+  - `bun run --cwd /data/workspace/uhub test:integration:gemini:local` 通过，输出可见 `gemini-nonstream` 与 `gemini-stream` 两条脚本均返回 `status: ok`
+  - `bun run --cwd /data/workspace/uhub typecheck` 通过
+  - `bun run --cwd /data/workspace/uhub build` 通过
+  - `.github/workflows/ci.yml` 文本中可见 `integration-gemini` 的 checkout/setup/install/run/upload artifacts 完整步骤，artifact 名称为 `gemini-integration-artifacts`
+- Learnings:
+  - provider job 一旦已经把 `artifacts/` 作为输出目录传给 `UHUB_ARTIFACTS_DIR`，补齐 upload step 就能最小代价提升 CI 可观测性，不需要再改测试入口。
+  - 这类 workflow 收口适合按 provider 独立补齐，避免一次性抽象成共享 job 导致 blast radius 扩大。

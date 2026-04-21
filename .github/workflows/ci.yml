@@ -114,6 +114,13 @@ jobs:
           bun install --frozen-lockfile 2>&1 | tee artifacts/install.log
           UHUB_ARTIFACTS_DIR=artifacts bun run test:integration:gemini:local 2>&1 | tee artifacts/gemini.log
 
+      - name: Upload Gemini artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gemini-integration-artifacts
+          path: artifacts/
+
   integration-admin:
     runs-on: ubuntu-latest
     needs: quality

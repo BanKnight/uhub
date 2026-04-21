@@ -1,25 +1,25 @@
 {
   "stories": [
     {
-      "id": "CIADMIN-US1",
-      "title": "在真实 CI workflow 中显式接入 admin integration job",
+      "id": "GEMART-US1",
+      "title": "为真实 CI workflow 的 Gemini integration job 补齐 artifacts 上传",
       "priority": 1,
       "passes": true,
       "acceptanceCriteria": [
-        "`.github/workflows/ci.yml` 新增独立 `integration-admin` job，与现有 provider integration jobs 并列且 `needs: quality`",
-        "`integration-admin` job 显式运行 `UHUB_ARTIFACTS_DIR=artifacts bun run test:integration:admin:local`，并上传 `admin-integration-artifacts`",
-        "本轮保持最小 blast radius：优先只改 `.github/workflows/ci.yml` 与 `.omc` 元数据，不碰 runtime，也不把 admin coverage 塞回 `integration-openai`"
+        "`.github/workflows/ci.yml` 的 `integration-gemini` job 保持 `needs: quality`，并在现有 run 步骤后新增独立 upload-artifact 步骤",
+        "新增步骤显式上传 `artifacts/`，artifact 名称为 `gemini-integration-artifacts`，且 `Run Gemini integration suite` 仍继续运行 `UHUB_ARTIFACTS_DIR=artifacts bun run test:integration:gemini:local`",
+        "本轮保持最小 blast radius：优先只改 `.github/workflows/ci.yml` 与 `.omc` 元数据，不碰 runtime，也不改已有测试逻辑"
       ]
     },
     {
-      "id": "CIADMIN-US2",
-      "title": "验证 CI admin 挂载结果并记录证据",
+      "id": "GEMART-US2",
+      "title": "验证 Gemini artifacts 挂载结果并记录证据",
       "priority": 2,
       "passes": true,
       "acceptanceCriteria": [
-        "运行 `bun run --cwd /data/workspace/uhub test:integration:admin:local` 通过，证明 workflow 将调用的入口真实可用",
-        "`.github/workflows/ci.yml` 文本中可见 `integration-admin` job 的 checkout/setup/install/run/upload artifacts 完整步骤",
-        "`.omc/progress.txt` 追加记录本轮 CI admin 编排收口的实现、验证结果与 learnings，且 git working tree 仅包含本轮相关的 `.github/workflows/ci.yml` / `.omc` / 必要元数据改动"
+        "运行 `bun run --cwd /data/workspace/uhub test:integration:gemini:local` 通过，证明 workflow 将调用的入口真实可用",
+        "`.github/workflows/ci.yml` 文本中可见 `integration-gemini` job 的 checkout/setup/install/run/upload artifacts 完整步骤，且 artifact 名称为 `gemini-integration-artifacts`",
+        "`.omc/progress.txt` 追加记录本轮 Gemini CI artifacts 收口的实现、验证结果与 learnings，且 git working tree 仅包含本轮相关的 `.github/workflows/ci.yml` / `.omc` / 必要元数据改动"
       ]
     }
   ]
