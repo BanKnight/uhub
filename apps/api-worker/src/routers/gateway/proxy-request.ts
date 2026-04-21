@@ -164,7 +164,10 @@ export async function proxyGatewayRequest(input: ProxyGatewayRequestInput) {
       );
     }
 
-    const prioritizedChannels = prioritizeGatewayChannels(activeChannels);
+    const prioritizedChannels = prioritizeGatewayChannels(
+      activeChannels,
+      input.c.req.raw.headers.get('x-trace-id')
+    );
 
     concurrencyLease = await acquireConcurrencyLease(
       input.c.env,

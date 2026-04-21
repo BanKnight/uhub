@@ -121,17 +121,52 @@ export async function requireActiveGatewayChannels(
   return activeChannels;
 }
 
-export function prioritizeGatewayChannels(channels: GatewayChannel[]) {
+function hashStringToUint32(value: string) {
+  let hash = 2166136261;
+
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return hash >>> 0;
+}
+
+function rotateChannels(channels: GatewayChannel[], offset: number) {
+  if (channels.length <= 1 || offset === 0) {
+    return channels;
+  }
+
+  return [...channels.slice(offset), ...channels.slice(0, offset)];
+}
+
+function prioritizeGatewayChannelBucket(
+  channels: GatewayChannel[],
+  traceId: string | null | undefined
+) {
+  if (channels.length <= 1 || !traceId) {
+    return channels;
+  }
+
+  return rotateChannels(channels, hashStringToUint32(traceId) % channels.length);
+}
+
+export function prioritizeGatewayChannels(channels: GatewayChannel[], traceId?: string | null) {
   const now = Date.now();
+  const healthyChannels: GatewayChannel[] = [];
+  const coolingDownChannels: GatewayChannel[] = [];
 
-  return [...channels].sort((left, right) => {
-    const leftCoolingDown = isChannelCoolingDown(left.id, now);
-    const rightCoolingDown = isChannelCoolingDown(right.id, now);
-
-    if (leftCoolingDown === rightCoolingDown) {
-      return 0;
+  for (const channel of channels) {
+    if (isChannelCoolingDown(channel.id, now)) {
+      coolingDownChannels.push(channel);
+      continue;
     }
 
-    return leftCoolingDown ? 1 : -1;
-  });
+    healthyChannels.push(channel);
+  }
+
+  return [
+    ...prioritizeGatewayChannelBucket(healthyChannels, traceId),
+    ...prioritizeGatewayChannelBucket(coolingDownChannels, traceId),
+  ];
 }
