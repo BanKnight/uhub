@@ -242,3 +242,14 @@
   - 本地 smoke 的目标应该是“协议面各一条 + 一个 admin/product 面回归”，而不是把完整 `test:integration:ci:raw` 缩写复制一份。
   - 继续复用 `run-with-local-worker.ts` 比引入新的 shell runner 更稳；后者现在仍未验证，而且带端口 listener kill 行为，不适合混入这类低 blast radius 收口。
 
+### Shell runner cleanup + provider-aware structured contract coverage（当前收口）
+- 删除了未纳入任何执行入口的 `tests/run-with-local-worker.sh`，避免保留一份固定端口 + listener kill 的高 blast radius 旧 runner。
+- 将 `tests/integration/admin-channel-structured.ts` 从仅验证 openai，扩为同时覆盖 `openai / anthropic / gemini` 三个 provider 的 create/list/update/status round-trip。
+- 新断言明确锁定跨 provider 的 `provider`、`protocol`、`models`、`defaultTestModel` 在 create 返回、list 结果、clear default、reactivate 后都保持一致。
+- 最新验证结果：
+  - `git status --short` 不再出现 `tests/run-with-local-worker.sh`
+  - `bun run --cwd /data/workspace/uhub test:integration:admin:channel-structured:local` 通过
+  - 新鲜输出中可见 anthropic / gemini provider 的 channel 均完成 created/updated/reactivated round-trip，且 `protocol`/`defaultTestModel` 正确回显
+- Learnings:
+  - 当前更真实的 gap 是“provider-aware 产品 contract 的回归保护不足”，而不是 runtime 缺功能；最小高价值补法是加集成测试，而不是再扩 runtime。
+  - `run-with-local-worker.ts` 已经吸收 shell runner 的必要能力，并通过动态端口把 blast radius 压得更低；保留 shell 版只会制造双轨维护和误用风险。

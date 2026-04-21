@@ -1,27 +1,27 @@
 {
   "stories": [
     {
-      "id": "SMOKE-US1",
-      "title": "在 package.json 中新增最小 integration smoke 聚合入口",
+      "id": "SHELL-US1",
+      "title": "收口未验证的本地 shell worker runner",
       "priority": 1,
       "passes": true,
       "acceptanceCriteria": [
-        "package.json 新增 test:integration:smoke:raw，且只聚合最小高价值回归子集，不复用完整 test:integration:ci:raw",
-        "package.json 新增 test:integration:smoke:local，并通过 tests/run-with-local-worker.ts 包装 test:integration:smoke:raw",
-        "package.json 新增 test:integration:smoke 作为 smoke 的默认入口，并指向 local 版本",
-        "本次改动只落在 package.json、.omc/prd.json、.omc/progress.txt 等元数据文件，不修改 runtime 代码"
+        "确认 `tests/run-with-local-worker.sh` 没有被 `package.json` 或仓库中的实际执行入口引用（仅出现在 `.omc/*` 记录中不算有效引用）",
+        "基于与 `tests/run-with-local-worker.ts` 的对比，确认 shell 版本没有额外必须能力，且固定端口 + listener kill 带来更高 blast radius",
+        "若 shell runner 不值得保留，则将 `tests/run-with-local-worker.sh` 从工作区移除；若值得保留，则必须补出新鲜验证证据",
+        "完成后 `git status --short` 不再出现 `tests/run-with-local-worker.sh`"
       ]
     },
     {
-      "id": "SMOKE-US2",
-      "title": "验证 smoke 入口并记录本轮收口结果",
+      "id": "GAP-US2",
+      "title": "补齐 provider-aware channel 结构化 contract 的跨 provider 集成验证",
       "priority": 2,
       "passes": true,
       "acceptanceCriteria": [
-        "运行 bun run --cwd /data/workspace/uhub test:integration:smoke:local 通过",
-        "smoke 入口覆盖的脚本集合包含 openai、anthropic、gemini 至少各一条，以及一个 admin/product 面回归",
-        ".omc/progress.txt 追加记录本轮 smoke 入口的实现与 learnings",
-        "git working tree 中除未验证的 tests/run-with-local-worker.sh 外，不残留本轮未提交功能改动"
+        "`tests/integration/admin-channel-structured.ts` 覆盖 openai 之外至少一条 anthropic 和一条 gemini 的 create/list/update round-trip 断言",
+        "断言跨 provider 的 `provider`、`protocol`、`models`、`defaultTestModel` 在 admin API 返回与 list 结果中保持一致",
+        "本轮改动不触碰 runtime 业务代码，只修改测试与 Ralph 元数据文件",
+        "运行 `bun run --cwd /data/workspace/uhub test:integration:admin:channel-structured:local` 通过，并提供新鲜证据"
       ]
     }
   ]
