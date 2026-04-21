@@ -20,19 +20,42 @@ jobs:
           bun-version: latest
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          bun install --frozen-lockfile 2>&1 | tee artifacts/install.log
 
       - name: Check formatting
-        run: bun run format:check
+        shell: bash
+        run: |
+          set -euo pipefail
+          bun run format:check 2>&1 | tee artifacts/format-check.log
 
       - name: Lint
-        run: bun run lint
+        shell: bash
+        run: |
+          set -euo pipefail
+          bun run lint 2>&1 | tee artifacts/lint.log
 
       - name: Typecheck
-        run: bun run typecheck
+        shell: bash
+        run: |
+          set -euo pipefail
+          bun run typecheck 2>&1 | tee artifacts/typecheck.log
 
       - name: Build
-        run: bun run build
+        shell: bash
+        run: |
+          set -euo pipefail
+          bun run build 2>&1 | tee artifacts/build.log
+
+      - name: Upload quality artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-artifacts
+          path: artifacts/
 
   integration-openai:
     runs-on: ubuntu-latest

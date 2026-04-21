@@ -1,25 +1,25 @@
 {
   "stories": [
     {
-      "id": "GEMART-US1",
-      "title": "为真实 CI workflow 的 Gemini integration job 补齐 artifacts 上传",
+      "id": "QUALART-US1",
+      "title": "为真实 CI workflow 的 quality job 补齐失败日志与 artifacts 上传",
       "priority": 1,
       "passes": true,
       "acceptanceCriteria": [
-        "`.github/workflows/ci.yml` 的 `integration-gemini` job 保持 `needs: quality`，并在现有 run 步骤后新增独立 upload-artifact 步骤",
-        "新增步骤显式上传 `artifacts/`，artifact 名称为 `gemini-integration-artifacts`，且 `Run Gemini integration suite` 仍继续运行 `UHUB_ARTIFACTS_DIR=artifacts bun run test:integration:gemini:local`",
+        "`.github/workflows/ci.yml` 的 `quality` job 仍保留 checkout/setup/install/format/lint/typecheck/build 语义，并为 install / format / lint / typecheck / build 各自保留最小日志证据",
+        "`quality` job 新增独立 upload-artifact 步骤，在失败时上传 `artifacts/`，artifact 名称为 `quality-artifacts`",
         "本轮保持最小 blast radius：优先只改 `.github/workflows/ci.yml` 与 `.omc` 元数据，不碰 runtime，也不改已有测试逻辑"
       ]
     },
     {
-      "id": "GEMART-US2",
-      "title": "验证 Gemini artifacts 挂载结果并记录证据",
+      "id": "QUALART-US2",
+      "title": "验证 quality artifacts 挂载结果并记录证据",
       "priority": 2,
       "passes": true,
       "acceptanceCriteria": [
-        "运行 `bun run --cwd /data/workspace/uhub test:integration:gemini:local` 通过，证明 workflow 将调用的入口真实可用",
-        "`.github/workflows/ci.yml` 文本中可见 `integration-gemini` job 的 checkout/setup/install/run/upload artifacts 完整步骤，且 artifact 名称为 `gemini-integration-artifacts`",
-        "`.omc/progress.txt` 追加记录本轮 Gemini CI artifacts 收口的实现、验证结果与 learnings，且 git working tree 仅包含本轮相关的 `.github/workflows/ci.yml` / `.omc` / 必要元数据改动"
+        "运行 `bun install --frozen-lockfile`、`bun run lint`、`bun run typecheck`、`bun run build` 通过；`bun run format:check` 在当前本地仓库基线下因 `tests/integration/admin-channel-structured.ts` 及本地 `.claude/worktrees/agent-a230375b/tests/integration/admin-channel-structured.ts` 的既有格式问题失败，证明 quality 失败路径现在具备可诊断的日志收集价值",
+        "`.github/workflows/ci.yml` 文本中可见 `quality` job 的 install / format / lint / typecheck / build 日志保留方式，以及失败时上传 `quality-artifacts` 的步骤",
+        "`.omc/progress.txt` 追加记录本轮 quality CI artifacts 收口的实现、验证结果与 learnings，且 git working tree 仅包含本轮相关的 `.github/workflows/ci.yml` / `.omc` / 必要元数据改动"
       ]
     }
   ]

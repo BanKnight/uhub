@@ -315,3 +315,18 @@
 - Learnings:
   - provider job 一旦已经把 `artifacts/` 作为输出目录传给 `UHUB_ARTIFACTS_DIR`，补齐 upload step 就能最小代价提升 CI 可观测性，不需要再改测试入口。
   - 这类 workflow 收口适合按 provider 独立补齐，避免一次性抽象成共享 job 导致 blast radius 扩大。
+
+### CI quality failure artifacts explicit upload（当前收口）
+- `.github/workflows/ci.yml` 将 `quality` job 的 `Install dependencies` / `Check formatting` / `Lint` / `Typecheck` / `Build` 全部改为 bash + tee 方式，把输出分别写到 `artifacts/install.log`、`artifacts/format-check.log`、`artifacts/lint.log`、`artifacts/typecheck.log`、`artifacts/build.log`。
+- 新增 `Upload quality artifacts` 步骤，并使用 `if: failure()` 在质量门失败时上传 `quality-artifacts`。
+- 本轮保持最小 blast radius：只改真实 workflow 与 `.omc` 元数据，不触碰 runtime，也未改已有测试逻辑。
+- 最新验证结果：
+  - `bun install --frozen-lockfile` 通过
+  - `bun run lint` 通过
+  - `bun run typecheck` 通过
+  - `bun run build` 通过
+  - `bun run format:check` 在当前本地仓库基线下失败，输出命中 `tests/integration/admin-channel-structured.ts` 与本地 `.claude/worktrees/agent-a230375b/tests/integration/admin-channel-structured.ts` 的既有格式问题；这正证明 quality 失败路径现在需要 artifacts 以便诊断
+  - `.github/workflows/ci.yml` 文本中可见 `quality` job 的 install / format / lint / typecheck / build 日志保留方式，以及 `if: failure()` 上传 `quality-artifacts`
+- Learnings:
+  - quality 这类质量门本来就更需要失败证据；当基线存在既有非绿状态时，补日志/artifacts 比在同一轮顺手修 unrelated 质量债更符合最小 blast radius。
+  - 本地 `.claude/worktrees/*` 会被 `biome check .` 扫进来；定位 quality 失败时要区分 repo 主文件与本地工作树镜像，避免误把环境噪音当成 workflow 回归。
