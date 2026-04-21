@@ -3,8 +3,8 @@ import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
 export const WORKER_BASE_URL = process.env.UHUB_WORKER_BASE_URL ?? 'http://127.0.0.1:8797';
-export const ADMIN_EMAIL = process.env.UHUB_ADMIN_EMAIL ?? 'admin@example.com';
-export const ADMIN_PASSWORD = process.env.UHUB_ADMIN_PASSWORD ?? 'admin123456';
+export const ADMIN_EMAIL = process.env.UHUB_ADMIN_EMAIL ?? 'ci-admin@example.com';
+export const ADMIN_PASSWORD = process.env.UHUB_ADMIN_PASSWORD ?? 'ci-admin-password-123';
 
 export function assert(condition: unknown, message: string): asserts condition {
   if (!condition) {
