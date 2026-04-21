@@ -277,3 +277,15 @@
 - Learnings:
   - 当 leaf integration 脚本已经稳定存在时，优先补一个 `bun run` 聚合入口是最低 blast radius 的收口方式，不需要再扩 runtime 或测试 harness。
   - admin/product 面回归可以先通过独立聚合入口沉淀，保持可复跑性，同时避免过早把默认 smoke 集合做大。
+
+### Admin bundle decoupling into CI aggregate（当前收口）
+- `package.json` 将 `test:integration:admin:channel-structured` 从 `test:integration:openai` 聚合中移除，避免 admin positive 继续隐含挂在 openai bundle 下。
+- `package.json` 将 `test:integration:ci:raw` 改为显式接入 `bun run test:integration:admin`，让 admin positive + invalid 通过独立聚合入口进入 CI 编排层。
+- 本轮保持最小 blast radius：只改 `package.json` 与 `.omc` 元数据，不触碰 runtime，也未扩大默认 `test:integration:smoke:raw` 集合。
+- 最新验证结果：
+  - `bun run --cwd /data/workspace/uhub test:integration:openai:local` 通过，输出只包含 `openai-nonstream` 与 `portal-overview-quota`，不再包含 admin structured channel 脚本
+  - `bun run --cwd /data/workspace/uhub test:integration:ci:local` 通过，输出尾部可见显式执行 `bun run test:integration:admin`，并继续串行跑通 admin structured positive + invalid 两条脚本
+  - 当前工作树仅包含本轮 admin 编排收口相关的 `package.json` / `.omc` 元数据改动
+- Learnings:
+  - provider / protocol 维度的 product-contract 回归不应长期寄生在 `openai` bundle 下；独立 `admin` 聚合入口更适合作为编排层挂载点。
+  - `tests/run-with-local-worker.ts` 场景下，不要并行跑多个 `*:local` harness；并行时可能因残留 `workerd` inspector 端口（如 `127.0.0.1:9233`）发生自冲突，导致假失败。

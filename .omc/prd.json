@@ -1,25 +1,25 @@
 {
   "stories": [
     {
-      "id": "AGG-US1",
-      "title": "为 admin structured channel contract 新增稳定聚合入口",
+      "id": "BUNDLE-US1",
+      "title": "将 admin coverage 从 openai 聚合中解耦并接入 CI 聚合层",
       "priority": 1,
       "passes": true,
       "acceptanceCriteria": [
-        "`package.json` 新增 `test:integration:admin`，只聚合现有 `test:integration:admin:channel-structured` 与 `test:integration:admin:channel-structured:invalid` 两条脚本",
-        "`package.json` 新增 `test:integration:admin:local`，并继续通过 `tests/run-with-local-worker.ts` 包装 `test:integration:admin`",
-        "本轮改动不扩大默认 smoke 集合，不修改 runtime 业务代码，也不改已有测试逻辑"
+        "`package.json` 中 `test:integration:openai` 不再隐含包含 `test:integration:admin:channel-structured`",
+        "`package.json` 中 `test:integration:ci:raw` 显式接入 `bun run test:integration:admin`，让 admin coverage 通过独立聚合入口进入更合适的 bundle",
+        "本轮保持最小 blast radius：只改 `package.json` 与 `.omc` 元数据，不碰 runtime，也不扩大默认 `test:integration:smoke:raw` 集合"
       ]
     },
     {
-      "id": "AGG-US2",
-      "title": "验证 admin 聚合入口并记录结果",
+      "id": "BUNDLE-US2",
+      "title": "验证 admin 编排解耦结果并记录证据",
       "priority": 2,
       "passes": true,
       "acceptanceCriteria": [
-        "运行 `bun run --cwd /data/workspace/uhub test:integration:admin:local` 通过",
-        "`.omc/progress.txt` 追加记录本轮 admin 聚合入口的实现、验证结果与 learnings",
-        "git working tree 中仅包含本轮聚合入口相关的 `package.json` / `.omc` 元数据改动，不残留已放弃方案噪音"
+        "运行 `bun run --cwd /data/workspace/uhub test:integration:openai:local` 通过，且输出不再包含 admin structured channel 脚本",
+        "运行 `bun run --cwd /data/workspace/uhub test:integration:ci:local` 通过，且 CI 聚合链路显式覆盖 `test:integration:admin`",
+        "`.omc/progress.txt` 追加记录本轮 admin 编排收口的实现、验证结果与 learnings，且 git working tree 仅包含本轮相关的 `package.json` / `.omc` 元数据改动"
       ]
     }
   ]
