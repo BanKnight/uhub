@@ -1,5 +1,5 @@
 <!-- OMC:START -->
-<!-- OMC:VERSION:4.11.4 -->
+<!-- OMC:VERSION:4.12.1 -->
 
 # oh-my-claudecode - Intelligent Multi-Agent Orchestration
 
@@ -39,6 +39,9 @@ If verification fails, keep iterating.
 
 <execution_protocols>
 Broad requests: explore first, then plan. 2+ independent tasks in parallel. `run_in_background` for builds/tests.
+Prefer subagents/skills over native `team`; keep multi-agent help without creating team state when possible.
+After any subagent/agent run, clean only the current session's leftover tmux panes/teammates; never touch global team state or other sessions.
+For admin-only metadata changes, verify runtime isolation with targeted greps in `apps/api-worker/src/services/gateway` and `apps/api-worker/src/routers/gateway`.
 Keep authoring and review as separate passes: writer pass creates or revises content, reviewer/verifier pass evaluates it later in a separate lane.
 Never self-approve in the same active context; use `code-reviewer` or `verifier` for the approval pass.
 Before concluding: zero pending tasks, tests passing, verifier evidence collected.
@@ -61,38 +64,5 @@ State: `.omc/state/`, `.omc/state/sessions/{sessionId}/`, `.omc/notepad.md`, `.o
 ## Setup
 
 Say "setup omc" or run `/oh-my-claudecode:omc-setup`.
-
-## Project Commands
-
-- Install deps: `bun install`
-- Build all: `bun run build`
-- Typecheck all: `bun run typecheck`
-- Lint: `bun run lint`
-- Lint autofix: `bun run lint:fix`
-- Format check: `bun run format:check`
-- Format write: `bun run format`
-- Full quality gate: `bun run check`
-- Apply local D1 migrations: `bun run db:migrate:local`
-
-## Repo Shape
-
-- `apps/admin-web` — admin UI for channels, API keys, analytics, audit
-- `apps/key-portal` — portal UI for raw-key exchange and request history
-- `apps/api-worker` — Hono + tRPC + Better Auth + D1 worker
-- `packages/shared` — shared zod schemas and cross-app contracts
-
-## Gateway Scope
-
-- Stable OpenAI-compatible path: `/v1/chat/completions`
-- Current Claude-compatible minimal path: `/anthropic/v1/messages`
-- Claude path currently supports the minimal non-stream messages flow; do not assume full Anthropic streaming parity yet
-
-## Quality Gates
-
-- This repo uses **Biome** for linting/formatting
-- Prefer `bun run format:check` + `bun run lint` + `bun run typecheck` + `bun run build` before claiming completion
-- CI is defined in `.github/workflows/ci.yml`
-- Pre-commit hook is defined in `.husky/pre-commit`
-- If hooks do not run locally yet, run `bun install` first so `husky` and `lint-staged` are available
 
 <!-- OMC:END -->
