@@ -114,6 +114,35 @@ jobs:
           bun install --frozen-lockfile 2>&1 | tee artifacts/install.log
           UHUB_ARTIFACTS_DIR=artifacts bun run test:integration:gemini:local 2>&1 | tee artifacts/gemini.log
 
+  integration-admin:
+    runs-on: ubuntu-latest
+    needs: quality
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Run Admin integration suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+
+          bun install --frozen-lockfile 2>&1 | tee artifacts/install.log
+          UHUB_ARTIFACTS_DIR=artifacts bun run test:integration:admin:local 2>&1 | tee artifacts/admin.log
+
+      - name: Upload Admin artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-integration-artifacts
+          path: artifacts/
+
   e2e-core:
     runs-on: ubuntu-latest
     needs: quality

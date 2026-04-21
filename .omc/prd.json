@@ -1,25 +1,25 @@
 {
   "stories": [
     {
-      "id": "BUNDLE-US1",
-      "title": "将 admin coverage 从 openai 聚合中解耦并接入 CI 聚合层",
+      "id": "CIADMIN-US1",
+      "title": "在真实 CI workflow 中显式接入 admin integration job",
       "priority": 1,
       "passes": true,
       "acceptanceCriteria": [
-        "`package.json` 中 `test:integration:openai` 不再隐含包含 `test:integration:admin:channel-structured`",
-        "`package.json` 中 `test:integration:ci:raw` 显式接入 `bun run test:integration:admin`，让 admin coverage 通过独立聚合入口进入更合适的 bundle",
-        "本轮保持最小 blast radius：只改 `package.json` 与 `.omc` 元数据，不碰 runtime，也不扩大默认 `test:integration:smoke:raw` 集合"
+        "`.github/workflows/ci.yml` 新增独立 `integration-admin` job，与现有 provider integration jobs 并列且 `needs: quality`",
+        "`integration-admin` job 显式运行 `UHUB_ARTIFACTS_DIR=artifacts bun run test:integration:admin:local`，并上传 `admin-integration-artifacts`",
+        "本轮保持最小 blast radius：优先只改 `.github/workflows/ci.yml` 与 `.omc` 元数据，不碰 runtime，也不把 admin coverage 塞回 `integration-openai`"
       ]
     },
     {
-      "id": "BUNDLE-US2",
-      "title": "验证 admin 编排解耦结果并记录证据",
+      "id": "CIADMIN-US2",
+      "title": "验证 CI admin 挂载结果并记录证据",
       "priority": 2,
       "passes": true,
       "acceptanceCriteria": [
-        "运行 `bun run --cwd /data/workspace/uhub test:integration:openai:local` 通过，且输出不再包含 admin structured channel 脚本",
-        "运行 `bun run --cwd /data/workspace/uhub test:integration:ci:local` 通过，且 CI 聚合链路显式覆盖 `test:integration:admin`",
-        "`.omc/progress.txt` 追加记录本轮 admin 编排收口的实现、验证结果与 learnings，且 git working tree 仅包含本轮相关的 `package.json` / `.omc` 元数据改动"
+        "运行 `bun run --cwd /data/workspace/uhub test:integration:admin:local` 通过，证明 workflow 将调用的入口真实可用",
+        "`.github/workflows/ci.yml` 文本中可见 `integration-admin` job 的 checkout/setup/install/run/upload artifacts 完整步骤",
+        "`.omc/progress.txt` 追加记录本轮 CI admin 编排收口的实现、验证结果与 learnings，且 git working tree 仅包含本轮相关的 `.github/workflows/ci.yml` / `.omc` / 必要元数据改动"
       ]
     }
   ]

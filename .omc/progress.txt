@@ -289,3 +289,16 @@
 - Learnings:
   - provider / protocol 维度的 product-contract 回归不应长期寄生在 `openai` bundle 下；独立 `admin` 聚合入口更适合作为编排层挂载点。
   - `tests/run-with-local-worker.ts` 场景下，不要并行跑多个 `*:local` harness；并行时可能因残留 `workerd` inspector 端口（如 `127.0.0.1:9233`）发生自冲突，导致假失败。
+
+### CI admin workflow explicit mount（当前收口）
+- `.github/workflows/ci.yml` 新增独立 `integration-admin` job，与 `integration-openai` / `integration-anthropic` / `integration-gemini` 并列，并继续 `needs: quality`。
+- job 步骤显式保留 `Checkout`、`Setup Bun`、`bun install --frozen-lockfile`、`UHUB_ARTIFACTS_DIR=artifacts bun run test:integration:admin:local`，以及 `actions/upload-artifact@v4` 上传 `admin-integration-artifacts`。
+- 本轮保持最小 blast radius：只改真实 workflow 与 `.omc` 元数据；继续复用已存在的 `test:integration:admin` / `test:integration:admin:local` 显式入口，没有把 admin coverage 塞回 `test:integration:openai`，也未改 runtime 或现有测试逻辑。
+- 最新验证结果：
+  - `bun run --cwd /data/workspace/uhub test:integration:admin:local` 通过，新鲜输出中继续串行跑通 `admin-channel-structured` 与 `admin-channel-structured-invalid`
+  - `bun run --cwd /data/workspace/uhub typecheck` 通过
+  - `bun run --cwd /data/workspace/uhub build` 通过
+  - `.github/workflows/ci.yml` 文本中可见 `integration-admin` 的 checkout/setup/install/run/upload artifacts 完整步骤
+- Learnings:
+  - 当 admin coverage 已经通过独立 `test:integration:admin` 聚合入口沉淀后，CI 最稳的挂载点是单独 job，而不是重新寄生回 provider job。
+  - 这一层修的是 workflow 编排，不是 runtime 能力；验证应优先围绕 `bun run` 入口与 workflow 文本对齐来取证。
