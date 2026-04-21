@@ -253,3 +253,15 @@
 - Learnings:
   - 当前更真实的 gap 是“provider-aware 产品 contract 的回归保护不足”，而不是 runtime 缺功能；最小高价值补法是加集成测试，而不是再扩 runtime。
   - `run-with-local-worker.ts` 已经吸收 shell runner 的必要能力，并通过动态端口把 blast radius 压得更低；保留 shell 版只会制造双轨维护和误用风险。
+
+### Admin structured channel negative contract coverage（当前收口）
+- 新增 `tests/integration/admin-channel-structured-invalid.ts`，作为最小自包含的 admin structured channel 负向 contract 集成脚本。
+- `package.json` 新增 `test:integration:admin:channel-structured:invalid` 与 `test:integration:admin:channel-structured:invalid:local`，继续复用 `tests/run-with-local-worker.ts`。
+- 当前负向脚本覆盖三条已声明 schema 边界：`admin.channels.create` 的 provider/protocol mismatch、`admin.channels.update` 的 provider/protocol mismatch、`admin.channels.create` 的 `defaultTestModel` 不在 `models` 中。
+- 最新验证结果：
+  - `bun run --cwd /data/workspace/uhub test:integration:admin:channel-structured:invalid:local` 通过
+  - 新鲜输出中三条负向 case 均返回 `400`
+  - 错误消息可区分为 `Protocol anthropic_messages is incompatible with provider openai` 与 `defaultTestModel must be included in models`
+- Learnings:
+  - 负向 contract 最适合拆成独立脚本，而不是塞进 happy-path；这样 smoke/CI 组合更干净，失败定位也更直接。
+  - 当前 schema 的真实边界是：create 同时校验 protocol/provider 与 defaultTestModel，update 只校验 protocol/provider；测试应忠实锁定现状，而不是把未来想要的行为提前写成必过断言。

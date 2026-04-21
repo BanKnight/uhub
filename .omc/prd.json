@@ -1,27 +1,27 @@
 {
   "stories": [
     {
-      "id": "SHELL-US1",
-      "title": "收口未验证的本地 shell worker runner",
+      "id": "NEG-US1",
+      "title": "新增 admin structured channel 负向 contract 集成入口",
       "priority": 1,
       "passes": true,
       "acceptanceCriteria": [
-        "确认 `tests/run-with-local-worker.sh` 没有被 `package.json` 或仓库中的实际执行入口引用（仅出现在 `.omc/*` 记录中不算有效引用）",
-        "基于与 `tests/run-with-local-worker.ts` 的对比，确认 shell 版本没有额外必须能力，且固定端口 + listener kill 带来更高 blast radius",
-        "若 shell runner 不值得保留，则将 `tests/run-with-local-worker.sh` 从工作区移除；若值得保留，则必须补出新鲜验证证据",
-        "完成后 `git status --short` 不再出现 `tests/run-with-local-worker.sh`"
+        "新增一个最小自包含的 admin structured channel 负向 integration 脚本，只覆盖现有 schema 已声明的边界，不修改 runtime 代码",
+        "根 `package.json` 新增对应 `bun run` 入口与 `:local` 入口，继续复用 `tests/run-with-local-worker.ts`",
+        "负向脚本至少覆盖：provider/protocol mismatch 在 `admin.channels.create` 被拒绝、provider/protocol mismatch 在 `admin.channels.update` 被拒绝、defaultTestModel 不在 models 中时 `admin.channels.create` 被拒绝",
+        "断言失败响应为非 2xx，且错误消息能区分协议不兼容与 defaultTestModel 非法两类边界"
       ]
     },
     {
-      "id": "GAP-US2",
-      "title": "补齐 provider-aware channel 结构化 contract 的跨 provider 集成验证",
+      "id": "NEG-US2",
+      "title": "验证 admin structured channel 负向 contract 并记录结果",
       "priority": 2,
       "passes": true,
       "acceptanceCriteria": [
-        "`tests/integration/admin-channel-structured.ts` 覆盖 openai 之外至少一条 anthropic 和一条 gemini 的 create/list/update round-trip 断言",
-        "断言跨 provider 的 `provider`、`protocol`、`models`、`defaultTestModel` 在 admin API 返回与 list 结果中保持一致",
-        "本轮改动不触碰 runtime 业务代码，只修改测试与 Ralph 元数据文件",
-        "运行 `bun run --cwd /data/workspace/uhub test:integration:admin:channel-structured:local` 通过，并提供新鲜证据"
+        "运行 `bun run --cwd /data/workspace/uhub test:integration:admin:channel-structured:invalid:local` 通过",
+        "本轮改动只落在 `package.json`、新的/相关的 integration 测试文件、`.omc/prd.json`、`.omc/progress.txt` 等测试或元数据文件，不触碰 runtime 业务代码",
+        "`.omc/progress.txt` 追加记录本轮负向 contract coverage 的实现、验证结果与 learnings",
+        "git working tree 中不残留与已放弃方案相关的额外噪音"
       ]
     }
   ]
